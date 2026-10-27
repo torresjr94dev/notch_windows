@@ -1,5 +1,6 @@
 mod activity;
 mod api;
+mod autostart;
 mod island;
 mod providers;
 mod settings;

@@ -51,3 +51,5 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 - Gestos: rueda sobre la isla para el volumen, swipe horizontal o Shift + rueda para
   cambiar de canción, feedback de presión.
 - ADR-0007 (animación y gestos).
+- Opción _Iniciar con Windows_ en la bandeja, consistente con el Administrador de
+  tareas.
