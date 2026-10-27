@@ -1,4 +1,5 @@
 mod island;
+mod settings;
 mod tray;
 
 use tauri::Manager;
@@ -9,10 +10,9 @@ pub fn run() {
         .manage(island::IslandState::default())
         .invoke_handler(tauri::generate_handler![island::set_hit_rect])
         .setup(|app| {
-            let window = app
-                .get_webview_window("island")
-                .ok_or("falta la ventana `island` en tauri.conf.json")?;
-            island::start(app.handle().clone(), window)?;
+            let settings_path = app.path().app_config_dir()?.join("settings.json");
+            app.manage(settings::SettingsStore::load(settings_path));
+            island::start(app.handle().clone(), &app.state::<island::IslandState>())?;
             tray::create(app.handle())?;
             Ok(())
         })

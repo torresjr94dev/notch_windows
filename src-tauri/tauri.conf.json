@@ -10,24 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "island",
-        "title": "Notch Windows",
-        "width": 560,
-        "height": 240,
-        "resizable": false,
-        "maximizable": false,
-        "minimizable": false,
-        "decorations": false,
-        "transparent": true,
-        "shadow": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "focus": false,
-        "focusable": false
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
