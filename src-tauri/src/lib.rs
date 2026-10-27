@@ -1,4 +1,5 @@
 mod island;
+mod tray;
 
 use tauri::Manager;
 
@@ -12,6 +13,7 @@ pub fn run() {
                 .get_webview_window("island")
                 .ok_or("falta la ventana `island` en tauri.conf.json")?;
             island::start(app.handle().clone(), window)?;
+            tray::create(app.handle())?;
             Ok(())
         })
         .run(tauri::generate_context!())

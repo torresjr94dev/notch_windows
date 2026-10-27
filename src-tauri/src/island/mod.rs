@@ -10,17 +10,20 @@ mod geometry;
 mod watcher;
 mod win32;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use tauri::{AppHandle, State, WebviewWindow};
 
 use geometry::Rect;
 
-/// Estado compartido entre los comandos del frontend y el hilo vigilante.
+/// Estado compartido entre los comandos del frontend, la bandeja y el hilo vigilante.
 #[derive(Default)]
 pub struct IslandState {
     /// Área sensible de la pastilla, en píxeles físicos relativos a la ventana.
     hit_rect: Mutex<Rect>,
+    /// El usuario la ocultó desde la bandeja.
+    user_hidden: AtomicBool,
 }
 
 impl IslandState {
@@ -28,6 +31,16 @@ impl IslandState {
         // `Rect` es `Copy`: aunque otro hilo haya hecho panic con el lock tomado,
         // el valor guardado sigue siendo válido.
         *self.hit_rect.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn user_hidden(&self) -> bool {
+        self.user_hidden.load(Ordering::Relaxed)
+    }
+
+    /// Alterna el ocultado manual y devuelve el valor nuevo. Solo cambia la bandera:
+    /// el vigilante es el único que muestra u oculta la ventana.
+    pub fn toggle_user_hidden(&self) -> bool {
+        !self.user_hidden.fetch_xor(true, Ordering::Relaxed)
     }
 }
 

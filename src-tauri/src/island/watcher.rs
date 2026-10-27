@@ -70,7 +70,8 @@ impl Watcher {
     }
 
     fn update_visibility(&mut self) {
-        let shown = !self.fullscreen;
+        let user_hidden = self.app.state::<IslandState>().user_hidden();
+        let shown = should_show(user_hidden, self.fullscreen);
         if shown == self.shown {
             return;
         }
@@ -128,9 +129,28 @@ impl Watcher {
     }
 }
 
+/// Ambas razones para esconderla son independientes: salir de pantalla completa no
+/// debe revivir una isla que el usuario ocultó a mano.
+fn should_show(user_hidden: bool, fullscreen: bool) -> bool {
+    !user_hidden && !fullscreen
+}
+
 fn cursor_inside(hwnd: RawHwnd, hit: geometry::Rect, margin: i32) -> bool {
     let (Some((cx, cy)), Some(win)) = (win32::cursor_pos(), win32::window_rect(hwnd)) else {
         return false;
     };
     hit.contains(cx - win.x, cy - win.y, margin)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_show;
+
+    #[test]
+    fn shows_only_when_nothing_hides_it() {
+        assert!(should_show(false, false));
+        assert!(!should_show(true, false));
+        assert!(!should_show(false, true));
+        assert!(!should_show(true, true));
+    }
 }
