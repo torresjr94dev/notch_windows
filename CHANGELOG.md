@@ -6,8 +6,17 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-10-27
+
+Primera versión publicada, con instalador para Windows.
+
 ### Añadido
 
+- Instalador NSIS en español: se instala para tu usuario, sin permisos de
+  administrador.
+- Ícono propio de la app.
+- Una sola instancia: abrir la app otra vez muestra la isla si estaba oculta, en vez de
+  crear una segunda.
 - Proyecto base con Tauri v2, Svelte 5 y Vite.
 - Ventana de la isla transparente, siempre encima y anclada arriba al centro del monitor
   principal. Se reubica sola si cambian la resolución, el DPI o la barra de tareas.
@@ -59,3 +68,14 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 - El hook de Claude Code sigue el ciclo completo: vuelve a "trabajando" tras aprobar un
   permiso (con la herramienta en uso), marca errores de la API y no se queda pegado al
   interrumpir.
+- Workflow de release: un tag `vX.Y.Z` compila el instalador en GitHub Actions y
+  publica el release con las notas de este archivo y el SHA-256.
+- ADR-0008 (distribución: instalador, firma y actualizaciones).
+
+### Corregido
+
+- _Iniciar con Windows_ se marcaba como activo aunque el arranque apuntara a otra copia
+  de la app (por ejemplo, la de `tauri dev`).
+
+[Sin publicar]: https://github.com/torresjr94dev/notch_windows/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/torresjr94dev/notch_windows/releases/tag/v0.1.0
