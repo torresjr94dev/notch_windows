@@ -1,32 +1,45 @@
-//! Privacidad: qué apps usan el micrófono o la cámara. Se lee de la misma fuente que el
-//! ícono de privacidad de la barra de tareas, el registro de `CapabilityAccessManager`:
-//! una app está usando el dispositivo mientras su `LastUsedTimeStop` vale 0.
+//! Privacidad: qué apps están usando el micrófono o la cámara.
 //!
-//! Sin polling: `RegNotifyChangeKeyValue` despierta al hilo cuando Windows escribe ahí.
+//! - **Micrófono:** sesiones de audio *activas* en los dispositivos de captura (Core
+//!   Audio). Cada sesión dice qué proceso la abrió.
+//! - **Cámara:** `IMFSensorActivityMonitor` de Media Foundation, la API con la que Windows
+//!   reporta qué proceso está transmitiendo desde un sensor de video.
+//!
+//! Antes se leía el registro `CapabilityAccessManager\ConsentStore` (`LastUsedTimeStop`
+//! en 0 = en uso), pero en Windows 11 reciente ya no se actualiza: en la build 26300 las
+//! entradas tenían semanas aunque la cámara y el micrófono estaban en uso. Ver ADR-0005.
 
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use windows::Win32::Foundation::{
-    CloseHandle, ERROR_NO_MORE_ITEMS, ERROR_SUCCESS, HANDLE, WIN32_ERROR,
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::Media::Audio::{
+    AudioSessionStateActive, DEVICE_STATE_ACTIVE, IAudioSessionControl2, IAudioSessionManager2,
+    IMMDeviceEnumerator, eCapture,
 };
-use windows::Win32::System::Registry::{
-    HKEY, HKEY_CURRENT_USER, KEY_NOTIFY, KEY_READ, REG_NOTIFY_CHANGE_LAST_SET,
-    REG_NOTIFY_CHANGE_NAME, RRF_RT_REG_QWORD, RegCloseKey, RegEnumKeyExW, RegGetValueW,
-    RegNotifyChangeKeyValue, RegOpenKeyExW,
+use windows::Win32::Media::MediaFoundation::{
+    IMFSensorActivitiesReport, IMFSensorActivitiesReportCallback,
+    IMFSensorActivitiesReportCallback_Impl, MF_API_VERSION, MF_SDK_VERSION,
+    MFCreateSensorActivityMonitor, MFSTARTUP_LITE, MFStartup,
 };
-use windows::Win32::System::Threading::{CreateEventW, INFINITE, WaitForMultipleObjects};
-use windows::core::{HSTRING, PWSTR};
+use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoInitializeEx};
+use windows::Win32::System::Threading::{
+    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+};
+use windows::core::{Interface, PWSTR, Ref, implement};
 
+use super::audio;
 use crate::activity::{ActivityHub, Privacy};
 
-const CONSENT_STORE: &str =
-    r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore";
-/// Las apps de escritorio (no empaquetadas) viven en esta subclave, una por ejecutable.
-const NON_PACKAGED: &str = "NonPackaged";
-/// Windows escribe inicio y fin de uso en pasos separados: esperar un poco evita leer
-/// el estado a medias.
-const SETTLE: Duration = Duration::from_millis(100);
+/// Revisar las sesiones de captura es una consulta en memoria de Core Audio: cada
+/// segundo no se nota y avisa casi al instante.
+const POLL: Duration = Duration::from_secs(1);
+/// Para procesos que no se dejan inspeccionar (elevados o del sistema): el indicador
+/// debe aparecer aunque no sepamos el nombre.
+const UNKNOWN_APP: &str = "Otra app";
+
+type Pids = Arc<Mutex<Vec<u32>>>;
 
 pub fn spawn(hub: ActivityHub) -> std::io::Result<()> {
     thread::Builder::new()
@@ -39,174 +52,142 @@ pub fn spawn(hub: ActivityHub) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Una clave del registro vigilada con su evento de notificación.
-struct Watched {
-    key: HKEY,
-    event: HANDLE,
+/// Recibe los reportes de actividad de cámara (en hilos de Media Foundation) y guarda
+/// qué procesos están transmitiendo.
+#[implement(IMFSensorActivitiesReportCallback)]
+struct CameraListener {
+    pids: Pids,
 }
 
-impl Watched {
-    fn open(capability: &str) -> windows::core::Result<Self> {
-        let mut key = HKEY::default();
-        let path = HSTRING::from(format!(r"{CONSENT_STORE}\{capability}"));
-        // SAFETY: out-param válido; la clave se cierra en `Drop`.
-        unsafe {
-            RegOpenKeyExW(
-                HKEY_CURRENT_USER,
-                &path,
-                None,
-                KEY_READ | KEY_NOTIFY,
-                &mut key,
-            )
-            .ok()?;
-        }
-        // SAFETY: evento sin nombre ni atributos; se cierra en `Drop`.
-        let event = unsafe { CreateEventW(None, false, false, None)? };
-        Ok(Self { key, event })
-    }
-
-    /// La notificación es de un solo disparo: hay que armarla de nuevo tras cada aviso.
-    fn arm(&self) -> windows::core::Result<()> {
-        // SAFETY: `key` y `event` son válidos mientras viva `self`.
-        unsafe {
-            RegNotifyChangeKeyValue(
-                self.key,
-                true,
-                REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET,
-                Some(self.event),
-                true,
-            )
-            .ok()
-        }
-    }
-}
-
-impl Drop for Watched {
-    fn drop(&mut self) {
-        // SAFETY: handles propios, abiertos en `open`.
-        unsafe {
-            let _ = RegCloseKey(self.key);
-            let _ = CloseHandle(self.event);
-        }
+impl IMFSensorActivitiesReportCallback_Impl for CameraListener_Impl {
+    fn OnActivitiesReport(
+        &self,
+        report: Ref<IMFSensorActivitiesReport>,
+    ) -> windows::core::Result<()> {
+        // Cada reporte es una foto completa de todos los sensores: reemplaza a la anterior.
+        let pids = streaming_pids(report.ok()?)?;
+        *self.pids.lock().unwrap_or_else(PoisonError::into_inner) = pids;
+        Ok(())
     }
 }
 
 fn run(hub: &ActivityHub) -> windows::core::Result<()> {
-    let microphone = Watched::open("microphone")?;
-    let camera = Watched::open("webcam")?;
+    // SAFETY: inicializa COM y Media Foundation en este hilo antes de usar sus APIs.
+    unsafe {
+        CoInitializeEx(None, COINIT_MULTITHREADED).ok()?;
+        MFStartup((MF_SDK_VERSION << 16) | MF_API_VERSION, MFSTARTUP_LITE)?;
+    }
+
+    let camera_pids = Pids::default();
+    let listener: IMFSensorActivitiesReportCallback = CameraListener {
+        pids: camera_pids.clone(),
+    }
+    .into();
+    // Si el monitor de cámara no está disponible, el micrófono sigue funcionando.
+    // SAFETY: el callback vive en `listener` mientras viva el monitor (todo este hilo).
+    let _camera_monitor = match unsafe { MFCreateSensorActivityMonitor(&listener) } {
+        Ok(monitor) => unsafe { monitor.Start() }.map(|_| monitor).ok(),
+        Err(err) => {
+            eprintln!("monitor de cámara no disponible: {err}");
+            None
+        }
+    };
+
+    let enumerator = audio::device_enumerator()?;
+    let own_pid = std::process::id();
     let mut last: Option<Privacy> = None;
     loop {
-        // Armar *antes* de leer: un cambio entre la lectura y la espera no se pierde.
-        microphone.arm()?;
-        camera.arm()?;
+        let microphone = microphone_pids(&enumerator).unwrap_or_default();
+        let camera = camera_pids
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         let privacy = Privacy {
-            microphone: apps_in_use(microphone.key),
-            camera: apps_in_use(camera.key),
+            microphone: app_names(microphone, own_pid),
+            camera: app_names(camera, own_pid),
         };
         if last.as_ref() != Some(&privacy) {
             hub.set_privacy(privacy.clone());
             last = Some(privacy);
         }
-        // SAFETY: los eventos viven en `microphone` y `camera`.
-        unsafe { WaitForMultipleObjects(&[microphone.event, camera.event], false, INFINITE) };
-        thread::sleep(SETTLE);
+        thread::sleep(POLL);
     }
 }
 
-fn apps_in_use(capability: HKEY) -> Vec<String> {
-    let mut apps = Vec::new();
-    for name in subkeys(capability) {
-        if name != NON_PACKAGED {
-            if in_use(capability, &name) {
-                apps.push(display_name(&name));
+fn streaming_pids(report: &IMFSensorActivitiesReport) -> windows::core::Result<Vec<u32>> {
+    let mut pids = Vec::new();
+    // SAFETY: llamadas COM de solo lectura sobre el reporte que nos prestó el callback.
+    unsafe {
+        for sensor in 0..report.GetCount()? {
+            let sensor = report.GetActivityReport(sensor)?;
+            for process in 0..sensor.GetProcessCount()? {
+                let activity = sensor.GetProcessActivity(process)?;
+                if activity.GetStreamingState()?.as_bool() {
+                    pids.push(activity.GetProcessId()?);
+                }
             }
-            continue;
-        }
-        let mut desktop = HKEY::default();
-        // SAFETY: out-param válido; se cierra abajo.
-        let opened = unsafe {
-            RegOpenKeyExW(
-                capability,
-                &HSTRING::from(NON_PACKAGED),
-                None,
-                KEY_READ,
-                &mut desktop,
-            )
-        };
-        if opened != ERROR_SUCCESS {
-            continue;
-        }
-        for exe in subkeys(desktop) {
-            if in_use(desktop, &exe) {
-                apps.push(display_name(&exe));
-            }
-        }
-        // SAFETY: clave abierta arriba.
-        unsafe {
-            let _ = RegCloseKey(desktop);
         }
     }
-    apps.sort();
-    apps.dedup();
-    apps
+    Ok(pids)
 }
 
-fn subkeys(key: HKEY) -> Vec<String> {
-    let mut names = Vec::new();
-    let mut buffer = [0u16; 512];
-    for index in 0.. {
-        let mut len = buffer.len() as u32;
-        // SAFETY: `buffer` y `len` describen un búfer válido de `len` caracteres.
-        let result: WIN32_ERROR = unsafe {
-            RegEnumKeyExW(
-                key,
-                index,
-                Some(PWSTR(buffer.as_mut_ptr())),
-                &mut len,
-                None,
-                None,
-                None,
-                None,
-            )
-        };
-        if result == ERROR_NO_MORE_ITEMS {
-            break;
-        }
-        if result == ERROR_SUCCESS {
-            names.push(String::from_utf16_lossy(&buffer[..len as usize]));
+/// Procesos con una sesión de audio activa en algún dispositivo de captura.
+fn microphone_pids(enumerator: &IMMDeviceEnumerator) -> windows::core::Result<Vec<u32>> {
+    let mut pids = Vec::new();
+    // SAFETY: llamadas COM de solo lectura; cada interfaz se suelta al salir del scope.
+    unsafe {
+        let devices = enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)?;
+        for index in 0..devices.GetCount()? {
+            let manager: IAudioSessionManager2 = devices.Item(index)?.Activate(CLSCTX_ALL, None)?;
+            let sessions = manager.GetSessionEnumerator()?;
+            for session in 0..sessions.GetCount()? {
+                let session = sessions.GetSession(session)?;
+                if session.GetState()? != AudioSessionStateActive {
+                    continue;
+                }
+                if let Ok(pid) = session.cast::<IAudioSessionControl2>()?.GetProcessId() {
+                    pids.push(pid);
+                }
+            }
         }
     }
+    Ok(pids)
+}
+
+/// Nombres únicos y ordenados. Fuera el PID 0 (sesiones del sistema) y la propia isla.
+fn app_names(pids: Vec<u32>, own_pid: u32) -> Vec<String> {
+    let mut names: Vec<String> = pids
+        .into_iter()
+        .filter(|&pid| pid != 0 && pid != own_pid)
+        .map(|pid| process_name(pid).unwrap_or_else(|| UNKNOWN_APP.to_owned()))
+        .collect();
+    names.sort();
+    names.dedup();
     names
 }
 
-fn in_use(parent: HKEY, app: &str) -> bool {
-    matches!(
-        (read_qword(parent, app, "LastUsedTimeStart"), read_qword(parent, app, "LastUsedTimeStop")),
-        (Some(start), Some(0)) if start != 0
-    )
+fn process_name(pid: u32) -> Option<String> {
+    // SAFETY: el handle se cierra antes de salir; el búfer y su tamaño van juntos.
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buffer = [0u16; 1024];
+        let mut len = buffer.len() as u32;
+        let queried = QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &mut len,
+        );
+        let _ = CloseHandle(handle);
+        queried.ok()?;
+        Some(display_name(&String::from_utf16_lossy(
+            &buffer[..len as usize],
+        )))
+    }
 }
 
-fn read_qword(parent: HKEY, subkey: &str, value: &str) -> Option<u64> {
-    let mut data = 0u64;
-    let mut size = size_of::<u64>() as u32;
-    // SAFETY: `data` tiene exactamente `size` bytes y se pide un REG_QWORD.
-    let result = unsafe {
-        RegGetValueW(
-            parent,
-            &HSTRING::from(subkey),
-            &HSTRING::from(value),
-            RRF_RT_REG_QWORD,
-            None,
-            Some(&mut data as *mut u64 as *mut _),
-            Some(&mut size),
-        )
-    };
-    (result == ERROR_SUCCESS).then_some(data)
-}
-
-/// Nombre legible a partir de la subclave: `C:#Program Files#…#chrome.exe` (escritorio)
-/// o `MSTeams_8wekyb3d8bbwe` (empaquetada).
-fn display_name(raw: &str) -> String {
+/// Nombre legible a partir de la ruta del ejecutable.
+fn display_name(path: &str) -> String {
     const KNOWN: [(&str, &str); 6] = [
         ("msteams", "Teams"),
         ("ms-teams", "Teams"),
@@ -215,51 +196,49 @@ fn display_name(raw: &str) -> String {
         ("obs64", "OBS"),
         ("zoom", "Zoom"),
     ];
-    let tail = raw.rsplit('#').next().unwrap_or(raw);
-    let tail = tail
+    let file = path.rsplit(['\\', '/']).next().unwrap_or(path);
+    let stem = file
         .strip_suffix(".exe")
-        .or_else(|| tail.strip_suffix(".EXE"))
-        .unwrap_or(tail);
-    // Paquetes: "Editor.App_hashdeeditor" → "App".
-    let tail = tail.split('_').next().unwrap_or(tail);
-    let tail = tail.rsplit('.').next().unwrap_or(tail);
-    if let Some((_, name)) = KNOWN.iter().find(|(id, _)| tail.eq_ignore_ascii_case(id)) {
+        .or_else(|| file.strip_suffix(".EXE"))
+        .unwrap_or(file);
+    if let Some((_, name)) = KNOWN.iter().find(|(id, _)| stem.eq_ignore_ascii_case(id)) {
         return (*name).to_owned();
     }
-    let mut chars = tail.chars();
+    let mut chars = stem.chars();
     match chars.next() {
         Some(first) => first.to_uppercase().chain(chars).collect(),
-        None => raw.to_owned(),
+        None => UNKNOWN_APP.to_owned(),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::display_name;
+    use super::{UNKNOWN_APP, app_names, display_name};
 
     #[test]
-    fn desktop_apps_use_their_executable() {
+    fn names_come_from_the_executable() {
         assert_eq!(
-            display_name("C:#Program Files#Google#Chrome#Application#chrome.exe"),
+            display_name(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
             "Chrome"
         );
         assert_eq!(
-            display_name(r"C:#Program Files#obs-studio#bin#64bit#obs64.exe"),
+            display_name(r"C:\Program Files\obs-studio\bin\64bit\obs64.exe"),
             "OBS"
         );
         assert_eq!(
-            display_name("C:#Users#me#AppData#Local#Discord#app#Discord.exe"),
-            "Discord"
+            display_name(
+                r"C:\Program Files\WindowsApps\Microsoft.WindowsCamera_2025.1.0.0_x64__8wekyb3d8bbwe\WindowsCamera.exe"
+            ),
+            "Cámara"
         );
+        assert_eq!(display_name(r"C:\Apps\ms-teams.exe"), "Teams");
+        assert_eq!(display_name(r"C:\Users\me\Discord\discord.exe"), "Discord");
+        assert_eq!(display_name(""), UNKNOWN_APP);
     }
 
     #[test]
-    fn packaged_apps_drop_publisher_and_hash() {
-        assert_eq!(display_name("MSTeams_8wekyb3d8bbwe"), "Teams");
-        assert_eq!(
-            display_name("Microsoft.WindowsCamera_8wekyb3d8bbwe"),
-            "Cámara"
-        );
-        assert_eq!(display_name("Contoso.Recorder_abc123"), "Recorder");
+    fn own_process_and_system_sessions_are_ignored() {
+        let own = std::process::id();
+        assert!(app_names(vec![0, own], own).is_empty());
     }
 }
