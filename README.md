@@ -9,6 +9,10 @@ la pantalla que crece con animaciones de resorte para mostrar actividades en viv
   navegadores, Reproductor multimedia…). En compacto muestra la carátula y un
   visualizador de audio; al pasar el cursor (o con un clic) se expande con título,
   artista, progreso con seek y controles. El glow toma el color de la carátula.
+- **Avisos del sistema:** volumen, brillo (laptops), cargador y batería baja, y
+  Bloq Mayús, como en el iPhone.
+- **Privacidad:** una burbuja naranja (micrófono) o verde (cámara) junto a la isla
+  mientras alguna app los usa, con el nombre de la app para lectores de pantalla.
 - **Una isla por monitor:** en el principal, en uno concreto o en todos.
 - **Nunca estorba:** fuera de la pastilla los clics pasan a lo que hay debajo, nunca le
   roba el foco a nadie, no aparece en la barra de tareas ni en Alt+Tab, y se esconde
@@ -67,6 +71,8 @@ Las preferencias se guardan en `%APPDATA%\dev.notchwindows.island\settings.json`
 ┌─ Rust (src-tauri) ─────────────────────────────────────────┐
 │ providers::media     GSMTC → Now Playing + controles        │
 │ providers::spectrum  WASAPI loopback + FFT → island:spectrum│
+│ providers::volume · brightness · power · keyboard           │
+│ providers::privacy   registro ConsentStore → mic/cámara     │
 │        │ upsert/remove                                      │
 │        ▼                                                    │
 │ activity             árbitro: prioridad, split, TTL         │
@@ -98,6 +104,8 @@ de fondo están documentadas en:
 - [ADR-0003: Una ventana por monitor, creada en runtime](docs/ADRs/0003-una-ventana-por-monitor.md)
 - [ADR-0004: Motor de actividades](docs/ADRs/0004-motor-de-actividades.md). Explica
   cómo agregar una fuente nueva.
+- [ADR-0005: Avisos del sistema](docs/ADRs/0005-avisos-del-sistema.md). Incluye por qué
+  el OSD de volumen de Windows sigue apareciendo.
 
 ## Estructura
 
@@ -108,7 +116,7 @@ de fondo están documentadas en:
 │   └── lib/                 lógica (con *.test.ts de vitest)
 ├── src-tauri/               backend (Rust)
 │   ├── src/activity/        modelo de actividades y árbitro
-│   ├── src/providers/       fuentes: medios, espectro
+│   ├── src/providers/       fuentes: medios, espectro, volumen, brillo, batería…
 │   ├── src/island/          ventanas de la isla (una por monitor)
 │   ├── src/settings.rs      preferencias persistidas
 │   ├── src/tray.rs
@@ -121,8 +129,6 @@ de fondo están documentadas en:
 
 ## Roadmap
 
-- **Sistema:** volumen y brillo, carga de batería, indicador de mic/cámara en uso,
-  Bloq Mayús.
 - **Live Activities:** API local para que scripts y apps publiquen en la isla
   (Claude Code, CI, deploys).
 - **Interacción:** split líquido con dos actividades, gestos (rueda = volumen, swipe =
