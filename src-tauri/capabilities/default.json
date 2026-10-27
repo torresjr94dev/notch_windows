@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos de la ventana de la isla",
-  "windows": ["island"],
+  "description": "Permisos de las ventanas de la isla (una por monitor)",
+  "windows": ["island-*"],
   "permissions": ["core:default"]
 }

@@ -17,16 +17,53 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.23"
+rustfft = "6.4"
+# Solo para los eventos de brillo (laptops). Comparte `windows` 0.62 con el resto.
+wmi = { version = "0.18", default-features = false }
+# El macro `#[implement]` (callbacks COM) genera rutas a `::windows_core`.
+windows-core = "0.62"
 # Misma versión que usa Tauri internamente: así `WebviewWindow::hwnd()` devuelve el mismo
 # tipo `HWND` y no compilamos dos copias del crate.
 windows = { version = "0.62", features = [
+  "Foundation",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_Devices_Display",
   "Win32_Foundation",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_Media_MediaFoundation",
+  "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+  "Win32_System_Variant",
+  "Win32_UI_Input_KeyboardAndMouse",
   "Win32_Graphics_Gdi",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
+# Servidor HTTP síncrono y mínimo para la API local: cuatro rutas en localhost no
+# justifican un runtime async.
+tiny_http = "0.12"
+
+# Solo para `examples/fake_media.rs`: estas features no entran al binario de la app.
+[dev-dependencies]
+windows = { version = "0.62", features = ["Media_Core", "Media_Playback", "Storage"] }
+
+# Sin compilación incremental: con `tauri dev`, clippy, tests y ejemplos, cada
+# configuración guardaba su propia caché y `target/debug/incremental` llegó a 8.5 GB
+# y llenó el disco. El crate es chico: recompilarlo completo cuesta segundos.
+[profile.dev]
+incremental = false
 
 # https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

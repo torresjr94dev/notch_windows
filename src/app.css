@@ -1,3 +1,24 @@
+/* Tokens: los componentes usan estos nombres, nunca colores sueltos. Paleta oscura de
+   la Dynamic Island: negro puro (la identidad) con acentos vivos. */
+:root {
+  color-scheme: dark;
+  --island-bg: #000;
+  --text-primary: #fff;
+  /* 62% de blanco sobre negro ≈ 8.6:1, de sobra para AA. */
+  --text-secondary: rgb(255 255 255 / 0.62);
+  --surface-raised: rgb(255 255 255 / 0.1);
+  --surface-hover: rgb(255 255 255 / 0.12);
+  --track: rgb(255 255 255 / 0.2);
+  /* Estados (paleta oscura de Apple): siempre acompañados de texto o ícono. */
+  --color-success: #30d158;
+  --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
+  --privacy-mic: #ff9f0a;
+  --privacy-camera: #30d158;
+  /* Naranja de Claude, el de la mascota en la CLI de Claude Code. */
+  --claude-orange: #d97757;
+}
+
 html,
 body,
 #app {
@@ -10,7 +31,7 @@ body,
 
 body {
   font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  color: #fff;
+  color: var(--text-primary);
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
