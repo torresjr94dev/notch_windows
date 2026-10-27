@@ -21,7 +21,9 @@ pub fn run() {
             app.manage(settings::SettingsStore::load(settings_path));
 
             let hub = activity::start(app.handle())?;
-            app.manage(providers::media::start(hub.clone())?);
+            let media = providers::media::start(hub.clone())?;
+            providers::spectrum::spawn(app.handle().clone(), media.playing.clone())?;
+            app.manage(media);
             app.manage(hub);
 
             island::start(app.handle().clone(), &app.state::<island::IslandState>())?;

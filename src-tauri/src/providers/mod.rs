@@ -3,3 +3,4 @@
 //! o colgada de Windows no frene a las demás.
 
 pub mod media;
+pub mod spectrum;
