@@ -11,7 +11,19 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // Una sola isla por sesión: con "Iniciar con Windows" y el acceso directo de Inicio
+    // es fácil abrir dos, encimadas y peleando por el puerto de la API. Abrirla otra vez
+    // muestra la que ya corre si estaba oculta. Solo en release: en desarrollo, `tauri
+    // dev` se cerraría en silencio con la versión instalada abierta (mismo identifier).
+    if !cfg!(debug_assertions) {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if app.state::<island::IslandState>().unhide() {
+                tray::refresh(app);
+            }
+        }));
+    }
+    builder
         .manage(island::IslandState::default())
         .invoke_handler(tauri::generate_handler![
             island::set_hit_rect,

@@ -77,6 +77,11 @@ impl IslandState {
         !self.user_hidden.fetch_xor(true, Ordering::Relaxed)
     }
 
+    /// Quita el ocultado manual y dice si estaba oculta.
+    pub fn unhide(&self) -> bool {
+        self.user_hidden.swap(false, Ordering::Relaxed)
+    }
+
     pub fn request_reconcile(&self) {
         self.reconcile_requested.store(true, Ordering::Relaxed);
     }
