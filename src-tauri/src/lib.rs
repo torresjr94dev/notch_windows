@@ -16,6 +16,7 @@ pub fn run() {
             activity::get_view,
             providers::media::media_control,
             providers::media::get_artwork,
+            providers::volume::adjust_volume,
         ])
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
@@ -26,7 +27,7 @@ pub fn run() {
             let hub = activity::start(app.handle())?;
             let media = providers::media::start(hub.clone())?;
             providers::spectrum::spawn(app.handle().clone(), media.playing.clone())?;
-            providers::volume::spawn(hub.clone())?;
+            app.manage(providers::volume::spawn(hub.clone())?);
             providers::brightness::spawn(hub.clone())?;
             providers::power::spawn(hub.clone())?;
             providers::keyboard::spawn(hub.clone())?;
