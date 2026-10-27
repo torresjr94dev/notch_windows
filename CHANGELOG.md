@@ -39,3 +39,9 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
   cargador y batería baja, y Bloq Mayús.
 - Burbuja de privacidad cuando una app usa el micrófono o la cámara.
 - ADR-0005 (avisos del sistema y por qué no se oculta el OSD nativo).
+- API local de Live Activities en `127.0.0.1` con token, rechazo de navegadores y
+  validación estricta; puerto configurable.
+- Integración con Claude Code vía hooks y seguidor de CI de GitHub Actions
+  (`scripts/`).
+- Opción de bandeja para abrir la carpeta de configuración.
+- `docs/live-activities.md` y ADR-0006 (API local).
