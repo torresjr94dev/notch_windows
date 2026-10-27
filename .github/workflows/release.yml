@@ -1,0 +1,91 @@
+# Subir un tag vX.Y.Z compila el instalador en un Windows limpio y publica el release
+# con él. Las notas salen de la sección de esa versión en CHANGELOG.md, más el SHA-256
+# del instalador (no está firmado: ver docs/ADRs/0008-distribucion.md).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      # Antes de compilar: un tag que no coincide con la versión o un CHANGELOG sin la
+      # sección publicaría un instalador con otro número o un release sin notas.
+      - name: Validar versión y CHANGELOG
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::El tag $GITHUB_REF_NAME no coincide con la versión $version de tauri.conf.json"
+            exit 1
+          fi
+          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md no tiene la sección ## [$version]"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Compilar el instalador
+        run: npm run tauri build
+
+      - name: Publicar el release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Sin espacios: GitHub los cambiaría por puntos y no coincidiría con las notas.
+          setup="Notch-Windows_${version}_x64-setup.exe"
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe "$setup"
+          sha=$(sha256sum "$setup" | cut -d' ' -f1)
+          {
+            # De la sección de esta versión hasta la siguiente o las referencias de links.
+            awk -v v="$version" '
+              index($0, "## [" v "]") == 1 { found = 1; next }
+              /^## \[/ || /^\[[^]]+\]: / { found = 0 }
+              found
+            ' CHANGELOG.md
+            cat <<EOF
+
+          ## Instalar
+
+          1. Descarga \`$setup\` y ábrelo. Se instala para tu usuario, sin
+             permisos de administrador.
+          2. El instalador no está firmado: si Windows muestra _"Windows protegió tu PC"_,
+             elige **Más información → Ejecutar de todas formas**.
+          3. La isla vive arriba al centro y se controla desde el ícono de la bandeja.
+
+          Para actualizar, instala la versión nueva encima: tus preferencias y el token de
+          la API se conservan.
+
+          **SHA-256:** \`$sha\`
+          (compruébalo con \`Get-FileHash <archivo>\` en PowerShell)
+          EOF
+          } > release-notes.md
+          gh release create "$GITHUB_REF_NAME" "$setup" \
+            --title "Notch Windows $GITHUB_REF_NAME" \
+            --notes-file release-notes.md
