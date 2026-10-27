@@ -23,7 +23,21 @@ export type ActivityData =
   /** `level` de 0 a 1. */
   | { kind: "brightness"; level: number }
   | { kind: "battery"; percent: number; charging: boolean; low: boolean }
-  | { kind: "capsLock"; on: boolean };
+  | { kind: "capsLock"; on: boolean }
+  | ({ kind: "live" } & LiveActivity);
+
+export type LiveState = "running" | "attention" | "success" | "error";
+export type LiveIcon = "claude" | "build" | "deploy" | "download" | "test" | "generic";
+
+/** Publicada por scripts o apps externas vía la API local. */
+export interface LiveActivity {
+  title: string;
+  subtitle: string | null;
+  state: LiveState;
+  /** De 0 a 1; `null` = indeterminado. */
+  progress: number | null;
+  icon: LiveIcon;
+}
 
 export interface Activity {
   id: string;

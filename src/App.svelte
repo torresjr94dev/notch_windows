@@ -5,6 +5,8 @@
   import CapsLockNotice from "./components/CapsLockNotice.svelte";
   import Clock from "./components/Clock.svelte";
   import LevelNotice from "./components/LevelNotice.svelte";
+  import LiveCompact from "./components/LiveCompact.svelte";
+  import LiveExpanded from "./components/LiveExpanded.svelte";
   import NowPlayingCompact from "./components/NowPlayingCompact.svelte";
   import NowPlayingExpanded from "./components/NowPlayingExpanded.svelte";
   import PrivacyBubble from "./components/PrivacyBubble.svelte";
@@ -76,6 +78,11 @@
   const accentRgb = $derived(artwork?.accent?.join(" ") ?? "255 255 255");
   const accent = $derived(`rgb(${accentRgb})`);
   const glowing = $derived(track?.playing === true && artwork?.accent != null);
+  // Algo externo necesita al usuario: anillo ámbar fijo (sin parpadeo; el color, el
+  // ícono y el texto ya lo dicen).
+  const attention = $derived(
+    current.activity?.data.kind === "live" && current.activity.data.state === "attention",
+  );
 
   if (!import.meta.env.DEV) {
     // El menú contextual de WebView2 (Atrás, Recargar, Inspeccionar) sobra en la isla.
@@ -90,6 +97,7 @@
   class="island"
   class:expanded={current.mode === "expanded"}
   class:glowing
+  class:attention
   style:width="{shape.current.width}px"
   style:height="{shape.current.height}px"
   style:border-radius="{shape.current.radius}px"
@@ -120,6 +128,10 @@
         <BatteryNotice {...current.activity.data} />
       {:else if current.activity?.data.kind === "capsLock"}
         <CapsLockNotice on={current.activity.data.on} />
+      {:else if current.activity?.data.kind === "live" && current.mode === "compact"}
+        <LiveCompact live={current.activity.data} />
+      {:else if current.activity?.data.kind === "live"}
+        <LiveExpanded live={current.activity.data} />
       {:else if track && current.mode === "compact"}
         <NowPlayingCompact {track} artworkUrl={artwork?.url ?? null} {accent} />
       {:else if track}
@@ -162,6 +174,12 @@
     box-shadow:
       0 0 0 1px rgb(var(--accent) / 0.2),
       0 6px 26px -6px rgb(var(--accent) / 0.55);
+  }
+
+  .island.attention {
+    box-shadow:
+      0 0 0 1.5px rgb(255 159 10 / 0.55),
+      0 6px 26px -6px rgb(255 159 10 / 0.5);
   }
 
   .content {

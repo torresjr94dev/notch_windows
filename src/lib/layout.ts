@@ -26,6 +26,10 @@ export const SHAPES: Record<Face, Record<Mode, Shape>> = {
     compact: { width: 250, height: 36, radius: 18 },
     expanded: { width: 420, height: 176, radius: 42 },
   },
+  live: {
+    compact: { width: 270, height: 36, radius: 18 },
+    expanded: { width: 380, height: 124, radius: 36 },
+  },
   // Los avisos del sistema son transitorios: nunca se expanden.
   volume: { compact: NOTICE, expanded: NOTICE },
   brightness: { compact: NOTICE, expanded: NOTICE },
