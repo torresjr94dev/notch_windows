@@ -40,10 +40,18 @@ pub fn set_hit_rect(rect: Rect, state: State<'_, IslandState>) {
         .unwrap_or_else(PoisonError::into_inner) = rect;
 }
 
+/// Prende o apaga el click-through. Llamar en el hilo principal: ahí tao aplica el
+/// cambio de forma síncrona y podemos corregir sus estilos justo después.
+fn set_click_through(window: &WebviewWindow, hwnd: win32::RawHwnd, enabled: bool) {
+    let _ = window.set_ignore_cursor_events(enabled);
+    win32::hide_from_alt_tab(hwnd);
+}
+
+/// Se llama desde `setup`, que corre en el hilo principal.
 pub fn start(app: AppHandle, window: WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
     let hwnd = win32::RawHwnd::from(window.hwnd()?);
     // Arranca transparente al mouse; el vigilante la "prende" cuando el cursor entra.
-    window.set_ignore_cursor_events(true)?;
+    set_click_through(&window, hwnd, true);
     watcher::spawn(app, window, hwnd)?;
     Ok(())
 }

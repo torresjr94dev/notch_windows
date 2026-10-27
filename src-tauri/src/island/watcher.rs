@@ -42,7 +42,10 @@ pub fn spawn(app: AppHandle, window: WebviewWindow, hwnd: RawHwnd) -> std::io::R
                     hovered = inside;
                     // Fuera de la pastilla la ventana es "transparente" al mouse: los
                     // clics caen en lo que haya debajo (p. ej. las pestañas de Chrome).
-                    let _ = window.set_ignore_cursor_events(!inside);
+                    let window = window.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        super::set_click_through(&window, hwnd, !inside);
+                    });
                     let _ = app.emit(HOVER_EVENT, inside);
                 }
 

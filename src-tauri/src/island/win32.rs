@@ -12,7 +12,9 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetWindowRect, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+    GWL_EXSTYLE, GetCursorPos, GetWindowLongPtrW, GetWindowRect, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_EX_APPWINDOW,
+    WS_EX_TOOLWINDOW,
 };
 
 use super::geometry::{MonitorArea, Rect};
@@ -78,6 +80,34 @@ pub fn window_rect(hwnd: RawHwnd) -> Option<Rect> {
     unsafe { GetWindowRect(hwnd.get(), &mut rect) }
         .ok()
         .map(|_| to_rect(rect))
+}
+
+/// Saca la ventana del Alt+Tab.
+///
+/// El `skipTaskbar` de tao solo quita la pestaña de la barra de tareas
+/// (`ITaskbarList::DeleteTab`) pero deja `WS_EX_APPWINDOW`, que obliga a Windows a
+/// listar la ventana en Alt+Tab. Como tao reescribe `GWL_EXSTYLE` completo en cada
+/// cambio de flags, hay que reaplicar esto después de cada uno. Llamar en el hilo principal.
+pub fn hide_from_alt_tab(hwnd: RawHwnd) {
+    let hwnd = hwnd.get();
+    // SAFETY: sin punteros de por medio; un HWND inválido solo hace fallar las llamadas.
+    unsafe {
+        let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let fixed = (current & !(WS_EX_APPWINDOW.0 as isize)) | WS_EX_TOOLWINDOW.0 as isize;
+        if fixed != current {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, fixed);
+            // Los cambios de estilo no se aplican hasta forzar un recálculo del marco.
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+        }
+    }
 }
 
 /// Mueve la ventana sin redimensionarla, sin tocar su orden Z y sin activarla.
