@@ -53,3 +53,9 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 - ADR-0007 (animación y gestos).
 - Opción _Iniciar con Windows_ en la bandeja, consistente con el Administrador de
   tareas.
+- Clic en una Live Activity lleva al frente su ventana de origen (`focusPid`): "Claude te
+  necesita" te deja en la terminal de esa sesión.
+- Logo pixel de Claude Code en sus actividades.
+- El hook de Claude Code sigue el ciclo completo: vuelve a "trabajando" tras aprobar un
+  permiso (con la herramienta en uso), marca errores de la API y no se queda pegado al
+  interrumpir.

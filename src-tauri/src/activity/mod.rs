@@ -114,6 +114,11 @@ pub struct LiveActivity {
     /// De 0 a 1; `None` = indeterminado.
     pub progress: Option<f32>,
     pub icon: LiveIcon,
+    /// Un clic en la actividad lleva al frente la ventana de este proceso (o de su
+    /// primer ancestro con ventana). No viaja al frontend: solo `focusable`.
+    #[serde(skip)]
+    pub focus_pid: Option<u32>,
+    pub focusable: bool,
 }
 
 /// Apps usando el micrófono o la cámara. No es una actividad: se muestra junto a
@@ -183,6 +188,26 @@ impl ActivityHub {
 /// alcanzaron a recibir el evento.
 #[derive(Default)]
 pub struct CurrentView(Mutex<IslandView>);
+
+/// Clic en una actividad externa: lleva al frente la ventana de quien la publicó (p. ej.
+/// la terminal donde Claude pide permiso). Devuelve si lo logró.
+#[tauri::command]
+pub fn focus_activity(id: String, current: State<'_, CurrentView>) -> bool {
+    let view = current
+        .0
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    let pid = [view.primary, view.secondary]
+        .into_iter()
+        .flatten()
+        .find(|activity| activity.id == id)
+        .and_then(|activity| match activity.data {
+            ActivityData::Live(live) => live.focus_pid,
+            _ => None,
+        });
+    pid.is_some_and(crate::focus::focus_process_window)
+}
 
 #[tauri::command]
 pub fn get_view(current: State<'_, CurrentView>) -> IslandView {

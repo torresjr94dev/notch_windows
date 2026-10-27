@@ -3,7 +3,7 @@
 //
 //   node scripts/island.mjs set <id> --title "Build" [--subtitle "main"]
 //        [--state running|attention|success|error] [--progress 0.4]
-//        [--icon claude|build|deploy|download|test|generic] [--ttl 10]
+//        [--icon claude|build|deploy|download|test|generic] [--ttl 10] [--focus-pid 1234]
 //   node scripts/island.mjs clear <id>
 //
 // También se puede importar: `import { setActivity, clearActivity } from "./island.mjs"`.
@@ -68,6 +68,7 @@ async function main() {
       progress: { type: "string" },
       icon: { type: "string" },
       ttl: { type: "string" },
+      "focus-pid": { type: "string" },
     },
   });
   const [command, id] = positionals;
@@ -80,6 +81,7 @@ async function main() {
       progress: values.progress === undefined ? undefined : Number(values.progress),
       icon: values.icon,
       ttlSeconds: values.ttl === undefined ? undefined : Number(values.ttl),
+      focusPid: values["focus-pid"] === undefined ? undefined : Number(values["focus-pid"]),
     });
   }
   console.error("Uso: island.mjs set <id> --title <texto> [opciones] | island.mjs clear <id>");

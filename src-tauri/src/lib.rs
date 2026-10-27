@@ -1,6 +1,7 @@
 mod activity;
 mod api;
 mod autostart;
+mod focus;
 mod island;
 mod providers;
 mod settings;
@@ -15,6 +16,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             island::set_hit_rect,
             activity::get_view,
+            activity::focus_activity,
             providers::media::media_control,
             providers::media::get_artwork,
             providers::volume::adjust_volume,
