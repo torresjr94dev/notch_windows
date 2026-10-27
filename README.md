@@ -11,6 +11,10 @@ la pantalla que crece con animaciones de resorte para mostrar actividades en viv
   artista, progreso con seek y controles. El glow toma el color de la carátula.
 - **Avisos del sistema:** volumen, brillo (laptops), cargador y batería baja, y
   Bloq Mayús, como en el iPhone.
+- **Live Activities:** una API local (`127.0.0.1` + token) para que scripts y apps
+  publiquen en la isla. Trae integración con **Claude Code** ("trabajando", "te
+  necesita", "terminó") y un seguidor de CI de GitHub Actions. Ver
+  [docs/live-activities.md](docs/live-activities.md).
 - **Privacidad:** una burbuja naranja (micrófono) o verde (cámara) junto a la isla
   mientras alguna app los usa, con el nombre de la app para lectores de pantalla.
 - **Una isla por monitor:** en el principal, en uno concreto o en todos.
@@ -61,6 +65,7 @@ controla desde el **icono en la bandeja**:
   nombre de modelo) o _Todas las pantallas_.
 - _Visualizador de audio_: captura la salida de audio (nunca el micrófono) solo mientras
   hay música sonando.
+- _Abrir carpeta de configuración_: `settings.json` y el token de la API.
 - _Salir_.
 
 Las preferencias se guardan en `%APPDATA%\dev.notchwindows.island\settings.json`.
@@ -73,6 +78,7 @@ Las preferencias se guardan en `%APPDATA%\dev.notchwindows.island\settings.json`
 │ providers::spectrum  WASAPI loopback + FFT → island:spectrum│
 │ providers::volume · brightness · power · keyboard           │
 │ providers::privacy   registro ConsentStore → mic/cámara     │
+│ api                  HTTP 127.0.0.1 + token → Live Activities│
 │        │ upsert/remove                                      │
 │        ▼                                                    │
 │ activity             árbitro: prioridad, split, TTL         │
@@ -106,6 +112,8 @@ de fondo están documentadas en:
   cómo agregar una fuente nueva.
 - [ADR-0005: Avisos del sistema](docs/ADRs/0005-avisos-del-sistema.md). Incluye por qué
   el OSD de volumen de Windows sigue apareciendo.
+- [ADR-0006: API local de Live Activities](docs/ADRs/0006-api-local-de-live-activities.md),
+  con su modelo de amenazas.
 
 ## Estructura
 
@@ -117,20 +125,20 @@ de fondo están documentadas en:
 ├── src-tauri/               backend (Rust)
 │   ├── src/activity/        modelo de actividades y árbitro
 │   ├── src/providers/       fuentes: medios, espectro, volumen, brillo, batería…
+│   ├── src/api/             API local de Live Activities
 │   ├── src/island/          ventanas de la isla (una por monitor)
 │   ├── src/settings.rs      preferencias persistidas
 │   ├── src/tray.rs
 │   ├── examples/            fixtures de desarrollo
 │   ├── capabilities/        permisos de Tauri
 │   └── tauri.conf.json
-├── docs/ADRs/               decisiones de arquitectura
+├── scripts/                 cliente de la API, hook de Claude Code, seguidor de CI
+├── docs/                    live-activities.md y ADRs/
 └── CHANGELOG.md
 ```
 
 ## Roadmap
 
-- **Live Activities:** API local para que scripts y apps publiquen en la isla
-  (Claude Code, CI, deploys).
 - **Interacción:** split líquido con dos actividades, gestos (rueda = volumen, swipe =
   cambiar canción), física por eje.
 - **Después:** timer/Pomodoro, calendario, audífonos Bluetooth, shelf de archivos,

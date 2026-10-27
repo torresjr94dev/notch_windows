@@ -30,6 +30,8 @@ pub struct Settings {
     /// Barras de audio en Now Playing. Implica capturar el audio del sistema mientras
     /// suena música, así que el usuario puede apagarlo.
     pub visualizer: bool,
+    /// Puerto de la API local (`127.0.0.1`). Configurable por si otro programa lo ocupa.
+    pub api_port: u16,
 }
 
 impl Default for Settings {
@@ -37,6 +39,7 @@ impl Default for Settings {
         Self {
             display: DisplayChoice::Primary,
             visualizer: true,
+            api_port: crate::api::DEFAULT_PORT,
         }
     }
 }

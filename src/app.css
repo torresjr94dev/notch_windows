@@ -12,6 +12,7 @@
   /* Estados (paleta oscura de Apple): siempre acompañados de texto o ícono. */
   --color-success: #30d158;
   --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
   --privacy-mic: #ff9f0a;
   --privacy-camera: #30d158;
 }

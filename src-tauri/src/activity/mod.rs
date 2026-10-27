@@ -12,7 +12,7 @@ use std::sync::{Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use board::Board;
@@ -24,6 +24,10 @@ pub const VIEW_EVENT: &str = "island:view";
 pub mod priority {
     /// Avisos de un par de segundos: volumen, brillo, Bloq Mayús, cargador.
     pub const TRANSIENT: u8 = 100;
+    /// Algo externo que necesita al usuario (p. ej. Claude pidiendo permiso).
+    pub const ATTENTION: u8 = 90;
+    /// Procesos externos en curso o recién terminados (Claude trabajando, un build).
+    pub const LIVE: u8 = 60;
     pub const MEDIA_PLAYING: u8 = 50;
     pub const MEDIA_PAUSED: u8 = 10;
 }
@@ -73,6 +77,43 @@ pub enum ActivityData {
     CapsLock {
         on: bool,
     },
+    /// Publicada por scripts o apps externas vía la API local (ver `crate::api`).
+    Live(LiveActivity),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LiveState {
+    Running,
+    /// Necesita al usuario: sube de prioridad por encima de la música.
+    Attention,
+    Success,
+    Error,
+}
+
+/// Íconos disponibles para las actividades externas. Un catálogo cerrado (en vez de
+/// aceptar URLs o SVG) mantiene la isla consistente y evita cargar contenido externo.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LiveIcon {
+    Claude,
+    Build,
+    Deploy,
+    Download,
+    Test,
+    #[default]
+    Generic,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveActivity {
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub state: LiveState,
+    /// De 0 a 1; `None` = indeterminado.
+    pub progress: Option<f32>,
+    pub icon: LiveIcon,
 }
 
 /// Apps usando el micrófono o la cámara. No es una actividad: se muestra junto a
