@@ -45,3 +45,9 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
   (`scripts/`).
 - Opción de bandeja para abrir la carpeta de configuración.
 - `docs/live-activities.md` y ADR-0006 (API local).
+- Split líquido: la actividad secundaria sale de la pastilla como burbuja (filtro
+  gooey).
+- Springs por eje: al expandir lidera el ancho y al colapsar el alto.
+- Gestos: rueda sobre la isla para el volumen, swipe horizontal o Shift + rueda para
+  cambiar de canción, feedback de presión.
+- ADR-0007 (animación y gestos).
