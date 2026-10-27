@@ -26,7 +26,25 @@ la pantalla que crece con animaciones de resorte para mostrar actividades en viv
   roba el foco a nadie, no aparece en la barra de tareas ni en Alt+Tab, y se esconde
   cuando su monitor tiene algo en pantalla completa.
 
-## Requisitos
+## Descargar e instalar
+
+1. Descarga `Notch-Windows_X.Y.Z_x64-setup.exe` del
+   [último release](https://github.com/torresjr94dev/notch_windows/releases/latest).
+2. Ábrelo. Se instala para tu usuario en `%LOCALAPPDATA%\Notch Windows`, sin permisos de
+   administrador.
+3. El instalador no está firmado: si Windows muestra _"Windows protegió tu PC"_, elige
+   **Más información → Ejecutar de todas formas**. Cada release publica el SHA-256 para
+   comprobarlo con `Get-FileHash`.
+
+Necesita Windows 10 u 11 de 64 bits. Si falta WebView2 (ya viene en Windows 11), el
+instalador lo descarga.
+
+- **Actualizar:** instala la versión nueva encima. Tus preferencias y el token de la API
+  se conservan.
+- **Desinstalar:** desde _Configuración → Aplicaciones_. Si tenías _Iniciar con Windows_
+  activo, desactívalo antes.
+
+## Requisitos para desarrollar
 
 | Herramienta                | Versión                                     | Notas                                                                       |
 | -------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
@@ -38,13 +56,17 @@ la pantalla que crece con animaciones de resorte para mostrar actividades en viv
 
 No se necesitan **variables de entorno**.
 
-## Instalación y uso
+## Desarrollo y uso
 
 ```bash
 npm install            # dependencias del frontend y la CLI de Tauri
 npm run tauri dev      # app en desarrollo con HMR (la primera compilación de Rust tarda)
-npm run tauri build    # instalador de producción en src-tauri/target/release/bundle
+npm run tauri build    # instalador en src-tauri/target/release/bundle/nsis
 ```
+
+Si tienes la versión instalada abierta, sal de ella desde la bandeja antes de
+`npm run tauri dev`: si no, las dos islas se enciman y la de desarrollo se queda sin API
+porque el puerto ya está ocupado.
 
 Antes de abrir un PR:
 
@@ -77,6 +99,18 @@ controla desde el **icono en la bandeja**:
 - _Salir_.
 
 Las preferencias se guardan en `%APPDATA%\dev.notchwindows.island\settings.json`.
+
+### Publicar una versión
+
+1. Sube el número en `package.json`, `src-tauri/Cargo.toml` y
+   `src-tauri/tauri.conf.json`, y cierra su sección en `CHANGELOG.md`
+   (`## [X.Y.Z] - fecha`).
+2. Fusiona el PR a `main`.
+3. Sube el tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+El workflow `release.yml` valida que el tag coincida con la versión, compila el
+instalador en GitHub Actions y publica el release con las notas del CHANGELOG y el
+SHA-256. Detalles en el [ADR-0008](docs/ADRs/0008-distribucion.md).
 
 ## Arquitectura
 
@@ -124,10 +158,13 @@ de fondo están documentadas en:
   con su modelo de amenazas.
 - [ADR-0007: Animación y gestos](docs/ADRs/0007-animacion-y-gestos.md), incluyendo por
   qué aquí se anima `width`/`height`.
+- [ADR-0008: Distribución](docs/ADRs/0008-distribucion.md): instalador, firma y
+  actualizaciones.
 
 ## Estructura
 
 ```
+├── .github/workflows/       release.yml: instalador y release al subir un tag
 ├── src/                     frontend (Svelte 5 + TS)
 │   ├── App.svelte
 │   ├── components/          piezas visuales
@@ -141,6 +178,7 @@ de fondo están documentadas en:
 │   ├── src/tray.rs
 │   ├── examples/            fixtures de desarrollo
 │   ├── capabilities/        permisos de Tauri
+│   ├── icons/               app-icon.svg y lo que genera `tauri icon`
 │   └── tauri.conf.json
 ├── scripts/                 cliente de la API, hook de Claude Code, seguidor de CI
 ├── docs/                    live-activities.md y ADRs/
