@@ -15,14 +15,14 @@ use rustfft::{Fft, FftPlanner};
 use tauri::{AppHandle, Emitter, Manager};
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-    IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE, eConsole, eRender,
+    IAudioCaptureClient, IAudioClient, WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
+    CLSCTX_ALL, COINIT_MULTITHREADED, CoInitializeEx, CoTaskMemFree,
 };
 use windows::core::GUID;
 
+use super::audio;
 use crate::settings::SettingsStore;
 
 pub const SPECTRUM_EVENT: &str = "island:spectrum";
@@ -169,10 +169,8 @@ fn capture(app: &AppHandle, playing: &AtomicBool) -> windows::core::Result<()> {
     // SAFETY: llamadas COM documentadas; los punteros devueltos por la API se liberan
     // con `CoTaskMemFree` como pide su contrato y no se usan después.
     unsafe {
-        let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-        let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
-        let initial_device = device_id(&device)?;
+        let enumerator = audio::device_enumerator()?;
+        let (device, initial_device) = audio::default_output(&enumerator)?;
         let client: IAudioClient = device.Activate(CLSCTX_ALL, None)?;
 
         let format = client.GetMixFormat()?;
@@ -233,8 +231,7 @@ fn capture(app: &AppHandle, playing: &AtomicBool) -> windows::core::Result<()> {
 
             if last_device_check.elapsed() >= DEVICE_CHECK {
                 last_device_check = Instant::now();
-                let current = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
-                if device_id(&current)? != initial_device {
+                if audio::default_output(&enumerator)?.1 != initial_device {
                     break;
                 }
             }
@@ -243,18 +240,6 @@ fn capture(app: &AppHandle, playing: &AtomicBool) -> windows::core::Result<()> {
         // Que las barras bajen a cero en vez de congelarse en el último cuadro.
         let _ = app.emit(SPECTRUM_EVENT, [0u8; BANDS]);
         Ok(())
-    }
-}
-
-unsafe fn device_id(
-    device: &windows::Win32::Media::Audio::IMMDevice,
-) -> windows::core::Result<String> {
-    // SAFETY: `GetId` devuelve un PWSTR que el llamador debe liberar.
-    unsafe {
-        let raw = device.GetId()?;
-        let id = raw.to_string().unwrap_or_default();
-        CoTaskMemFree(Some(raw.0 as *const _));
-        Ok(id)
     }
 }
 

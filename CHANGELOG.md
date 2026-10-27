@@ -35,3 +35,7 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 - Tests de frontend con vitest; `npm test` corre vitest y cargo test.
 - Fixture `fake_media` para probar Now Playing sin música.
 - ADR-0004 (motor de actividades).
+- Avisos transitorios de volumen (callback de Core Audio), brillo (WMI, laptops),
+  cargador y batería baja, y Bloq Mayús.
+- Burbuja de privacidad cuando una app usa el micrófono o la cámara.
+- ADR-0005 (avisos del sistema y por qué no se oculta el OSD nativo).

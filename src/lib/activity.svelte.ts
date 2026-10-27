@@ -16,7 +16,14 @@ export interface NowPlaying {
   sampledAtMs: number;
 }
 
-export type ActivityData = { kind: "nowPlaying" } & NowPlaying;
+export type ActivityData =
+  | ({ kind: "nowPlaying" } & NowPlaying)
+  /** `level` de 0 a 1. */
+  | { kind: "volume"; level: number; muted: boolean }
+  /** `level` de 0 a 1. */
+  | { kind: "brightness"; level: number }
+  | { kind: "battery"; percent: number; charging: boolean; low: boolean }
+  | { kind: "capsLock"; on: boolean };
 
 export interface Activity {
   id: string;
@@ -25,16 +32,23 @@ export interface Activity {
   data: ActivityData;
 }
 
+/** Apps usando el micrófono o la cámara; se muestran junto a cualquier actividad. */
+export interface Privacy {
+  microphone: string[];
+  camera: string[];
+}
+
 export interface IslandView {
   primary: Activity | null;
   secondary: Activity | null;
+  privacy: Privacy;
 }
 
 export const BANDS = 16;
 
 /** Estado compartido por todos los componentes de esta isla. */
 export const island = $state({
-  view: { primary: null, secondary: null } as IslandView,
+  view: { primary: null, secondary: null, privacy: { microphone: [], camera: [] } } as IslandView,
   spectrum: new Array<number>(BANDS).fill(0),
 });
 

@@ -10,6 +10,9 @@ export interface Shape {
   radius: number;
 }
 
+/** Volumen, brillo y batería comparten forma: un aviso ancho y bajo. */
+const NOTICE: Shape = { width: 300, height: 38, radius: 19 };
+
 /**
  * Tamaños en px CSS. La ventana mide 560×240 (`island::WINDOW_SIZE` en Rust): la forma
  * más grande más el rebote del spring y el glow tienen que caber.
@@ -22,6 +25,14 @@ export const SHAPES: Record<Face, Record<Mode, Shape>> = {
   nowPlaying: {
     compact: { width: 250, height: 36, radius: 18 },
     expanded: { width: 420, height: 176, radius: 42 },
+  },
+  // Los avisos del sistema son transitorios: nunca se expanden.
+  volume: { compact: NOTICE, expanded: NOTICE },
+  brightness: { compact: NOTICE, expanded: NOTICE },
+  battery: { compact: NOTICE, expanded: NOTICE },
+  capsLock: {
+    compact: { width: 260, height: 38, radius: 19 },
+    expanded: { width: 260, height: 38, radius: 19 },
   },
 };
 

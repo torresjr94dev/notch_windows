@@ -9,6 +9,11 @@
   --surface-raised: rgb(255 255 255 / 0.1);
   --surface-hover: rgb(255 255 255 / 0.12);
   --track: rgb(255 255 255 / 0.2);
+  /* Estados (paleta oscura de Apple): siempre acompañados de texto o ícono. */
+  --color-success: #30d158;
+  --color-danger: #ff453a;
+  --privacy-mic: #ff9f0a;
+  --privacy-camera: #30d158;
 }
 
 html,

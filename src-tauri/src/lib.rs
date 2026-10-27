@@ -23,6 +23,11 @@ pub fn run() {
             let hub = activity::start(app.handle())?;
             let media = providers::media::start(hub.clone())?;
             providers::spectrum::spawn(app.handle().clone(), media.playing.clone())?;
+            providers::volume::spawn(hub.clone())?;
+            providers::brightness::spawn(hub.clone())?;
+            providers::power::spawn(hub.clone())?;
+            providers::keyboard::spawn(hub.clone())?;
+            providers::privacy::spawn(hub.clone())?;
             app.manage(media);
             app.manage(hub);
 
