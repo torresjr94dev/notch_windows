@@ -1,4 +1,5 @@
 mod activity;
+mod api;
 mod island;
 mod providers;
 mod settings;
@@ -17,8 +18,10 @@ pub fn run() {
             providers::media::get_artwork,
         ])
         .setup(|app| {
-            let settings_path = app.path().app_config_dir()?.join("settings.json");
-            app.manage(settings::SettingsStore::load(settings_path));
+            let config_dir = app.path().app_config_dir()?;
+            let settings = settings::SettingsStore::load(config_dir.join("settings.json"));
+            let api_port = settings.get().api_port;
+            app.manage(settings);
 
             let hub = activity::start(app.handle())?;
             let media = providers::media::start(hub.clone())?;
@@ -28,6 +31,8 @@ pub fn run() {
             providers::power::spawn(hub.clone())?;
             providers::keyboard::spawn(hub.clone())?;
             providers::privacy::spawn(hub.clone())?;
+            let token = api::token::load_or_create(&config_dir.join("api-token"))?;
+            api::start(hub.clone(), api_port, token)?;
             app.manage(media);
             app.manage(hub);
 

@@ -12,6 +12,7 @@ const TRAY_ID: &str = "main";
 const TOGGLE_ID: &str = "toggle";
 const QUIT_ID: &str = "quit";
 const VISUALIZER_ID: &str = "visualizer";
+const CONFIG_DIR_ID: &str = "config-dir";
 const DISPLAY_PRIMARY_ID: &str = "display:primary";
 const DISPLAY_ALL_ID: &str = "display:all";
 /// Seguido del id estable del monitor.
@@ -99,6 +100,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         settings.visualizer,
         None::<&str>,
     )?;
+    // Ahí viven settings.json y el token de la API que leen los scripts y hooks.
+    let config = MenuItem::with_id(
+        app,
+        CONFIG_DIR_ID,
+        "Abrir carpeta de configuración",
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, QUIT_ID, "Salir", true, None::<&str>)?;
     Menu::with_items(
         app,
@@ -107,6 +116,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &display_menu,
             &visualizer,
             &PredefinedMenuItem::separator(app)?,
+            &config,
             &quit,
         ],
     )
@@ -127,6 +137,12 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
             app.state::<SettingsStore>()
                 .update(|settings| settings.visualizer = !settings.visualizer);
             None
+        }
+        CONFIG_DIR_ID => {
+            if let Ok(dir) = app.path().app_config_dir() {
+                let _ = std::process::Command::new("explorer").arg(dir).spawn();
+            }
+            return;
         }
         DISPLAY_PRIMARY_ID => Some(DisplayChoice::Primary),
         DISPLAY_ALL_ID => Some(DisplayChoice::All),

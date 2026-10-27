@@ -36,6 +36,7 @@ windows = { version = "0.62", features = [
   "Win32_Media_Audio",
   "Win32_Media_Audio_Endpoints",
   "Win32_Security",
+  "Win32_Security_Cryptography",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Power",
@@ -47,6 +48,9 @@ windows = { version = "0.62", features = [
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
+# Servidor HTTP síncrono y mínimo para la API local: cuatro rutas en localhost no
+# justifican un runtime async.
+tiny_http = "0.12"
 
 # Solo para `examples/fake_media.rs`: estas features no entran al binario de la app.
 [dev-dependencies]
