@@ -19,3 +19,10 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
   actividad por defecto. Respeta la opción "Efectos de animación" de Windows.
 - `npm run lint` (Prettier, svelte-check, rustfmt, clippy) y `npm test`.
 - ADR-0001 (stack) y ADR-0002 (ventana y click-through).
+- Selección de pantalla desde la bandeja: el monitor principal, un monitor concreto
+  (identificado por su nombre de modelo) o todas las pantallas. Las islas se crean, mueven
+  y destruyen solas al conectar o desconectar monitores.
+- La pantalla completa se detecta por monitor: un juego en un monitor ya no esconde la
+  isla de los demás.
+- Preferencias persistidas en `settings.json`.
+- ADR-0003 (una ventana por monitor).

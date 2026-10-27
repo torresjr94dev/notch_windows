@@ -36,18 +36,28 @@ npm run format         # aplica Prettier y rustfmt
 ```
 
 Una vez abierta, la app no tiene ventana principal ni pestaña en la barra de tareas. Se
-controla desde el **icono en la bandeja**: _Ocultar/Mostrar isla_ y _Salir_.
+controla desde el **icono en la bandeja**:
+
+- _Ocultar/Mostrar isla_.
+- _Pantalla_: el monitor principal de Windows, un monitor concreto (aparece con su
+  nombre de modelo) o _Todas las pantallas_.
+- _Salir_.
+
+Las preferencias se guardan en `%APPDATA%\dev.notchwindows.island\settings.json`.
 
 ## Arquitectura
 
 ```
 ┌─ Rust (src-tauri) ─────────────────────────────────────┐
 │ island::watcher   hilo vigilante (30 Hz)                │
+│   ├─ monitores (500 ms) → crear / reasignar / destruir  │
 │   ├─ hit-test del cursor → click-through + island:hover │
-│   ├─ pantalla completa (500 ms) → ocultar / mostrar     │
-│   └─ anclaje arriba al centro (500 ms)                  │
+│   ├─ pantalla completa por monitor → ocultar / mostrar  │
+│   └─ anclaje arriba al centro de cada monitor           │
+│ island::displays  reglas de monitores, puras y con tests│
 │ island::win32     todo el FFI con Win32 (único unsafe)  │
 │ island::geometry  geometría pura, con tests             │
+│ settings          preferencias en settings.json         │
 │ tray              icono y menú de bandeja               │
 └──────────────┬──────────────────────▲──────────────────┘
        evento  │ island:hover         │ comando set_hit_rect
@@ -65,6 +75,7 @@ de fondo están documentadas en:
 - [ADR-0001: Tauri v2 + Svelte 5 como stack](docs/ADRs/0001-stack-tauri-v2.md)
 - [ADR-0002: Ventana fija, click-through y convivencia con tao](docs/ADRs/0002-ventana-fija-y-click-through.md).
   **Léelo antes de tocar cualquier cosa de la ventana.**
+- [ADR-0003: Una ventana por monitor, creada en runtime](docs/ADRs/0003-una-ventana-por-monitor.md)
 
 ## Estructura
 
@@ -73,10 +84,11 @@ de fondo están documentadas en:
 │   ├── App.svelte
 │   └── lib/
 ├── src-tauri/               backend (Rust)
-│   ├── src/island/          ventana de la isla
+│   ├── src/island/          ventanas de la isla (una por monitor)
+│   ├── src/settings.rs      preferencias persistidas
 │   ├── src/tray.rs
 │   ├── capabilities/        permisos de Tauri
-│   └── tauri.conf.json      config de la ventana
+│   └── tauri.conf.json
 ├── docs/ADRs/               decisiones de arquitectura
 └── CHANGELOG.md
 ```
