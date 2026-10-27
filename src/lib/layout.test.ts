@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Activity } from "./activity.svelte";
+import type { Activity, IslandView } from "./activity.svelte";
 import { layout } from "./layout";
 
 const music: Activity = {
@@ -20,22 +20,34 @@ const music: Activity = {
   },
 };
 
+const volume: Activity = {
+  id: "system:volume",
+  priority: 100,
+  transient: true,
+  data: { kind: "volume", level: 0.4, muted: false },
+};
+
+function view(primary: Activity | null, secondary: Activity | null = null): IslandView {
+  return { primary, secondary, privacy: { microphone: [], camera: [] } };
+}
+
 describe("layout", () => {
   it("sin actividades muestra la isla vacía o el reloj", () => {
-    const empty = { primary: null, secondary: null };
-    expect(layout(empty, false)).toEqual({ face: "idle", mode: "compact", activity: null });
-    expect(layout(empty, true).mode).toBe("expanded");
+    expect(layout(view(null), false)).toEqual({ face: "idle", mode: "compact", activity: null });
+    expect(layout(view(null), true).mode).toBe("expanded");
   });
 
   it("el hover expande la actividad principal", () => {
-    const view = { primary: music, secondary: null };
-    expect(layout(view, true)).toEqual({ face: "nowPlaying", mode: "expanded", activity: music });
+    expect(layout(view(music), true)).toEqual({
+      face: "nowPlaying",
+      mode: "expanded",
+      activity: music,
+    });
   });
 
   it("un transitorio gana aunque haya hover y nunca se expande", () => {
-    const volume = { ...music, id: "volume", transient: true };
-    expect(layout({ primary: volume, secondary: music }, true)).toEqual({
-      face: "nowPlaying",
+    expect(layout(view(volume, music), true)).toEqual({
+      face: "volume",
       mode: "compact",
       activity: volume,
     });

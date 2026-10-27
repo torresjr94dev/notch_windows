@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { fade } from "svelte/transition";
+  import { fade, scale } from "svelte/transition";
   import { Spring, prefersReducedMotion } from "svelte/motion";
+  import BatteryNotice from "./components/BatteryNotice.svelte";
+  import CapsLockNotice from "./components/CapsLockNotice.svelte";
   import Clock from "./components/Clock.svelte";
+  import LevelNotice from "./components/LevelNotice.svelte";
   import NowPlayingCompact from "./components/NowPlayingCompact.svelte";
   import NowPlayingExpanded from "./components/NowPlayingExpanded.svelte";
-  import { connect, island } from "./lib/activity.svelte";
+  import PrivacyBubble from "./components/PrivacyBubble.svelte";
+  import { connect, island, type Activity, type NowPlaying } from "./lib/activity.svelte";
   import { loadArtwork, type Artwork } from "./lib/artwork";
   import { hitArea } from "./lib/hitArea";
   import { onHoverIntent } from "./lib/hoverIntent";
@@ -41,13 +45,21 @@
 
   $effect(() => connect());
 
-  const track = $derived(
-    current.activity?.data.kind === "nowPlaying" ? current.activity.data : null,
-  );
+  const nowPlaying = (activity: Activity | null): NowPlaying | null =>
+    activity?.data.kind === "nowPlaying" ? activity.data : null;
+
+  /** La canción que se dibuja en la pastilla ahora mismo. */
+  const track = $derived(nowPlaying(current.activity));
+  /** La canción esté donde esté (también en la burbuja mientras dura un aviso): así la
+   *  carátula no se descarta y vuelve a cargar cada vez que sube el volumen. */
+  const music = $derived(nowPlaying(island.view.primary) ?? nowPlaying(island.view.secondary));
+
+  const privacy = $derived(island.view.privacy);
+  const showPrivacy = $derived(privacy.microphone.length > 0 || privacy.camera.length > 0);
 
   let artwork = $state<Artwork | null>(null);
   $effect(() => {
-    const id = track?.artworkId;
+    const id = music?.artworkId;
     if (!id) {
       artwork = null;
       return;
@@ -96,7 +108,19 @@
       in:reveal
       out:fade={{ duration: 90 }}
     >
-      {#if track && current.mode === "compact"}
+      {#if current.activity?.data.kind === "volume"}
+        <LevelNotice
+          kind="volume"
+          level={current.activity.data.level}
+          muted={current.activity.data.muted}
+        />
+      {:else if current.activity?.data.kind === "brightness"}
+        <LevelNotice kind="brightness" level={current.activity.data.level} />
+      {:else if current.activity?.data.kind === "battery"}
+        <BatteryNotice {...current.activity.data} />
+      {:else if current.activity?.data.kind === "capsLock"}
+        <CapsLockNotice on={current.activity.data.on} />
+      {:else if track && current.mode === "compact"}
         <NowPlayingCompact {track} artworkUrl={artwork?.url ?? null} {accent} />
       {:else if track}
         <NowPlayingExpanded {track} artworkUrl={artwork?.url ?? null} {accent} />
@@ -106,6 +130,19 @@
     </div>
   {/key}
 </main>
+
+{#if showPrivacy}
+  <!-- A la izquierda de la pastilla y a la altura de la forma compacta, siguiendo el
+       spring cuadro por cuadro. Es solo indicador: queda fuera del área de clic. -->
+  <div
+    class="privacy"
+    style:top="{8 + (Math.min(shape.current.height, 38) - 26) / 2}px"
+    style:right="calc(50% + {shape.current.width / 2 + 8}px)"
+    transition:scale={{ duration: 200, start: 0.6 }}
+  >
+    <PrivacyBubble {privacy} />
+  </div>
+{/if}
 
 <style>
   .island {
@@ -138,5 +175,9 @@
     height: 100%;
     display: grid;
     place-items: center;
+  }
+
+  .privacy {
+    position: fixed;
   }
 </style>
