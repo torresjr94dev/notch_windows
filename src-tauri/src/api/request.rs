@@ -120,6 +120,8 @@ struct LiveRequest {
     #[serde(default)]
     icon: LiveIcon,
     ttl_seconds: Option<u64>,
+    /// PID cuya ventana (o la de su primer ancestro con ventana) se enfoca al hacer clic.
+    focus_pid: Option<u32>,
 }
 
 fn running() -> LiveState {
@@ -152,6 +154,9 @@ pub fn activity(id: &str, body: &[u8]) -> Result<Activity, ApiError> {
     if request.progress.is_some_and(|p| !p.is_finite()) {
         return Err(ApiError::BadRequest("`progress` debe ser un número".into()));
     }
+    if request.focus_pid == Some(0) {
+        return Err(ApiError::BadRequest("`focusPid` no puede ser 0".into()));
+    }
     let ttl = match request.ttl_seconds {
         Some(seconds) => Some(Duration::from_secs(seconds).min(MAX_TTL)),
         None if matches!(request.state, LiveState::Success | LiveState::Error) => Some(DONE_TTL),
@@ -171,6 +176,8 @@ pub fn activity(id: &str, body: &[u8]) -> Result<Activity, ApiError> {
             state: request.state,
             progress: request.progress.map(|p| p.clamp(0.0, 1.0)),
             icon: request.icon,
+            focus_pid: request.focus_pid,
+            focusable: request.focus_pid.is_some(),
         }),
         ttl,
     })
@@ -247,6 +254,20 @@ mod tests {
         assert_eq!(done.ttl, Some(DONE_TTL));
         let custom = activity("c", br#"{"title":"t","state":"error","ttlSeconds":30}"#).unwrap();
         assert_eq!(custom.ttl, Some(Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn focus_pid_makes_the_activity_focusable_without_exposing_the_pid() {
+        let published = activity("c", br#"{"title":"t","focusPid":4242}"#).unwrap();
+        let ActivityData::Live(live) = published.data else {
+            panic!("debe ser Live")
+        };
+        assert_eq!(live.focus_pid, Some(4242));
+        assert!(live.focusable);
+        let json = serde_json::to_value(&live).unwrap();
+        assert!(json.get("focusPid").is_none() && json["focusable"] == true);
+
+        assert!(activity("c", br#"{"title":"t","focusPid":0}"#).is_err());
     }
 
     #[test]
