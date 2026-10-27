@@ -12,7 +12,7 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowRect, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+    GetCursorPos, GetWindowRect, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
 };
 
 use super::geometry::{MonitorArea, Rect};
@@ -58,6 +58,16 @@ pub fn primary_monitor_area() -> Option<MonitorArea> {
         bounds: to_rect(info.rcMonitor),
         work: to_rect(info.rcWork),
     })
+}
+
+/// Posición del cursor en coordenadas de pantalla (píxeles físicos: tao declara al
+/// proceso como per-monitor DPI aware).
+pub fn cursor_pos() -> Option<(i32, i32)> {
+    let mut point = POINT::default();
+    // SAFETY: `point` es un out-param válido.
+    unsafe { GetCursorPos(&mut point) }
+        .ok()
+        .map(|_| (point.x, point.y))
 }
 
 /// Rectángulo de la ventana en coordenadas de pantalla. Como la isla no tiene marco

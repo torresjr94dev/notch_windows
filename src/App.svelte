@@ -1,4 +1,8 @@
-<main class="island">Notch Windows</main>
+<script lang="ts">
+  import { hitArea } from "./lib/hitArea";
+</script>
+
+<main class="island" {@attach hitArea}>Notch Windows</main>
 
 <style>
   .island {

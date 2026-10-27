@@ -1,35 +1,62 @@
-//! Hilo vigilante de la isla: la mantiene anclada arriba al centro del monitor principal.
+//! Hilo vigilante de la isla: decide cuándo la ventana deja pasar los clics y la
+//! mantiene anclada arriba al centro del monitor principal.
 //!
-//! Corre con polling a propósito: lo que vigila (monitor, resolución, DPI, barra de
-//! tareas) no tiene un evento único y barato al que suscribirse desde Tauri, y revisarlo
-//! cada medio segundo cuesta prácticamente cero.
+//! Corre con polling a propósito. La alternativa por eventos para el cursor es un hook
+//! global de mouse (`WH_MOUSE_LL`), que se mete en el camino de *todo* el input del
+//! sistema: si este hilo se atora, se atora el mouse de todo Windows. `GetCursorPos`
+//! a 30 Hz cuesta prácticamente cero y no pone nada en riesgo.
 
 use std::thread;
 use std::time::Duration;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
+use super::IslandState;
 use super::geometry;
 use super::win32::{self, RawHwnd};
 
 const TICK: Duration = Duration::from_millis(33);
 /// Cada cuántos ticks se revisa lo que cambia lento (~500 ms).
 const SLOW_TICKS: u32 = 15;
+/// Histéresis al salir de la pastilla, en píxeles físicos.
+const HOVER_EXIT_MARGIN: i32 = 8;
 
-pub fn spawn(app: AppHandle, hwnd: RawHwnd) -> std::io::Result<()> {
+pub const HOVER_EVENT: &str = "island:hover";
+
+pub fn spawn(app: AppHandle, window: WebviewWindow, hwnd: RawHwnd) -> std::io::Result<()> {
     thread::Builder::new()
         .name("island-watcher".into())
         .spawn(move || {
+            let state = app.state::<IslandState>();
+            let mut hovered = false;
             let mut tick: u32 = 0;
             loop {
                 if tick.is_multiple_of(SLOW_TICKS) {
                     keep_anchored(&app, hwnd);
                 }
                 tick = tick.wrapping_add(1);
+
+                let margin = if hovered { HOVER_EXIT_MARGIN } else { 0 };
+                let inside = cursor_inside(hwnd, state.hit_rect(), margin);
+                if inside != hovered {
+                    hovered = inside;
+                    // Fuera de la pastilla la ventana es "transparente" al mouse: los
+                    // clics caen en lo que haya debajo (p. ej. las pestañas de Chrome).
+                    let _ = window.set_ignore_cursor_events(!inside);
+                    let _ = app.emit(HOVER_EVENT, inside);
+                }
+
                 thread::sleep(TICK);
             }
         })?;
     Ok(())
+}
+
+fn cursor_inside(hwnd: RawHwnd, hit: geometry::Rect, margin: i32) -> bool {
+    let (Some((cx, cy)), Some(win)) = (win32::cursor_pos(), win32::window_rect(hwnd)) else {
+        return false;
+    };
+    hit.contains(cx - win.x, cy - win.y, margin)
 }
 
 /// Reubica la ventana si cambió el monitor principal, la resolución, el DPI (que

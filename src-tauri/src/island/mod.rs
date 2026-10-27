@@ -2,17 +2,48 @@
 //! arriba al centro del monitor principal.
 //!
 //! La ventana es de tamaño fijo y la pastilla se anima *dentro* de ella con CSS:
-//! redimensionar una ventana nativa cuadro por cuadro se traba. Ver
+//! redimensionar una ventana nativa cuadro por cuadro se traba. Por eso la ventana deja
+//! pasar los clics en todo lo que no sea la pastilla. Ver
 //! `docs/ADRs/0002-ventana-fija-y-click-through.md`.
 
 mod geometry;
 mod watcher;
 mod win32;
 
-use tauri::{AppHandle, WebviewWindow};
+use std::sync::{Mutex, PoisonError};
 
-pub fn start(app: AppHandle, window: &WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
+use tauri::{AppHandle, State, WebviewWindow};
+
+use geometry::Rect;
+
+/// Estado compartido entre los comandos del frontend y el hilo vigilante.
+#[derive(Default)]
+pub struct IslandState {
+    /// Área sensible de la pastilla, en píxeles físicos relativos a la ventana.
+    hit_rect: Mutex<Rect>,
+}
+
+impl IslandState {
+    fn hit_rect(&self) -> Rect {
+        // `Rect` es `Copy`: aunque otro hilo haya hecho panic con el lock tomado,
+        // el valor guardado sigue siendo válido.
+        *self.hit_rect.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// El frontend reporta aquí el área de la pastilla cada vez que cambia de tamaño.
+#[tauri::command]
+pub fn set_hit_rect(rect: Rect, state: State<'_, IslandState>) {
+    *state
+        .hit_rect
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = rect;
+}
+
+pub fn start(app: AppHandle, window: WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
     let hwnd = win32::RawHwnd::from(window.hwnd()?);
-    watcher::spawn(app, hwnd)?;
+    // Arranca transparente al mouse; el vigilante la "prende" cuando el cursor entra.
+    window.set_ignore_cursor_events(true)?;
+    watcher::spawn(app, window, hwnd)?;
     Ok(())
 }
