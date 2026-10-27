@@ -38,6 +38,10 @@ windows = { version = "0.62", features = [
   "Win32_UI_WindowsAndMessaging",
 ] }
 
+# Solo para `examples/fake_media.rs`: estas features no entran al binario de la app.
+[dev-dependencies]
+windows = { version = "0.62", features = ["Media_Core", "Media_Playback", "Storage"] }
+
 # https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1
