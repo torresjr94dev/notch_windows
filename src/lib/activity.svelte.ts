@@ -37,6 +37,8 @@ export interface LiveActivity {
   /** De 0 a 1; `null` = indeterminado. */
   progress: number | null;
   icon: LiveIcon;
+  /** Un clic lleva al frente la ventana de quien la publicó (`focus_activity`). */
+  focusable: boolean;
 }
 
 export interface Activity {

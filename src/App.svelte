@@ -19,6 +19,7 @@
   import { onHoverIntent } from "./lib/hoverIntent";
   import { SHAPES, layout } from "./lib/layout";
   import { DAMPING, axisStiffness, visibleRadius } from "./lib/motion";
+  import { focusTarget } from "./lib/live";
   import { reveal } from "./lib/reveal";
 
   /** Margen sobre la pastilla, en px CSS. */
@@ -161,6 +162,14 @@
     }
   }
 
+  /** Clic en la pastilla o la burbuja: si la actividad viene de una ventana (Claude en
+   *  su terminal), te lleva ahí; si no, expande la isla sin esperar el hover. */
+  function activate(activity: Activity | null) {
+    const id = focusTarget(activity);
+    if (id) void invoke("focus_activity", { id });
+    else clicked = true;
+  }
+
   function onPress(event: PointerEvent) {
     // Los botones tienen su propio feedback; la pastilla entera no debe encogerse.
     pressed = !(event.target as Element).closest("button");
@@ -237,7 +246,8 @@
     style:width="{pill.w}px"
     style:height="{pill.h}px"
     style:border-radius="{pill.r}px"
-    onclick={() => (clicked = true)}
+    class:focusable={focusTarget(current.activity) !== null}
+    onclick={() => activate(current.activity)}
   >
     {#key `${current.face}:${current.mode}`}
       <!-- Tamaño fijo y centrado: mientras la pastilla crece, el contenido se "destapa"
@@ -265,7 +275,7 @@
         {:else if current.activity?.data.kind === "live" && current.mode === "compact"}
           <LiveCompact live={current.activity.data} />
         {:else if current.activity?.data.kind === "live"}
-          <LiveExpanded live={current.activity.data} />
+          <LiveExpanded live={current.activity.data} onfocus={() => activate(current.activity)} />
         {:else if track && current.mode === "compact"}
           <NowPlayingCompact {track} artworkUrl={artwork?.url ?? null} {accent} />
         {:else if track}
@@ -285,7 +295,8 @@
       style:top="{bubbleTop}px"
       style:width="{BUBBLE}px"
       style:height="{BUBBLE}px"
-      onclick={() => (clicked = true)}
+      class:focusable={focusTarget(lastSecondary) !== null}
+      onclick={() => activate(lastSecondary)}
     >
       {#if showBubble}
         <div class="bubble-content" transition:fade={{ duration: 120 }}>
@@ -387,6 +398,12 @@
 
   .bubble {
     position: absolute;
+  }
+
+  /* Lleva a otra ventana: el cursor lo anuncia antes del clic. */
+  .pill.focusable,
+  .bubble.focusable {
+    cursor: pointer;
   }
 
   .bubble-content {

@@ -15,6 +15,8 @@
   --color-warning: #ff9f0a;
   --privacy-mic: #ff9f0a;
   --privacy-camera: #30d158;
+  /* Naranja de Claude, el de la mascota en la CLI de Claude Code. */
+  --claude-orange: #d97757;
 }
 
 html,

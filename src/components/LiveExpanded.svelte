@@ -1,10 +1,17 @@
 <script lang="ts">
+  import ArrowUpRight from "@lucide/svelte/icons/arrow-up-right";
   import type { LiveActivity } from "../lib/activity.svelte";
   import { STATE_COLOR, STATE_LABEL, progressLabel } from "../lib/live";
   import LiveGlyph from "./LiveGlyph.svelte";
   import LiveStatus from "./LiveStatus.svelte";
 
-  let { live }: { live: LiveActivity } = $props();
+  interface Props {
+    live: LiveActivity;
+    /** Lleva al frente la ventana de origen; solo si `live.focusable`. */
+    onfocus?: () => void;
+  }
+
+  let { live, onfocus }: Props = $props();
 
   const percent = $derived(progressLabel(live.progress));
 </script>
@@ -30,6 +37,18 @@
       <span class="value">{percent}</span>
     {:else}
       <span class="state" style:color={STATE_COLOR[live.state]}>{STATE_LABEL[live.state]}</span>
+    {/if}
+    {#if live.focusable && onfocus}
+      <!-- Toda la isla es clickeable, pero el botón hace visible que lo es. -->
+      <button
+        class="go"
+        onclick={(event) => {
+          event.stopPropagation();
+          onfocus();
+        }}
+      >
+        Ir a la ventana <ArrowUpRight size={14} strokeWidth={2.5} aria-hidden="true" />
+      </button>
     {/if}
   </div>
 </div>
@@ -108,6 +127,34 @@
     background: var(--text-primary);
     transform-origin: left;
     transition: transform 300ms ease-out;
+  }
+
+  .go {
+    margin-left: auto;
+    min-height: 28px;
+    padding: 0 10px 0 12px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition:
+      background-color 150ms ease,
+      transform 120ms ease;
+  }
+
+  .go:hover {
+    background: var(--surface-hover);
+  }
+
+  .go:active {
+    transform: scale(0.95);
   }
 
   .value,
