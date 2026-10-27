@@ -11,10 +11,13 @@ use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
 };
+use windows::Win32::UI::Shell::{
+    QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN, SHQueryUserNotificationState,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GetCursorPos, GetWindowLongPtrW, GetWindowRect, SWP_FRAMECHANGED, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_EX_APPWINDOW,
-    WS_EX_TOOLWINDOW,
+    GWL_EXSTYLE, GetCursorPos, GetWindowLongPtrW, GetWindowRect, SW_HIDE, SW_SHOWNOACTIVATE,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW,
+    SetWindowPos, ShowWindow, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
 };
 
 use super::geometry::{MonitorArea, Rect};
@@ -108,6 +111,31 @@ pub fn hide_from_alt_tab(hwnd: RawHwnd) {
             );
         }
     }
+}
+
+/// ¿Hay algo en pantalla completa? `QUNS_BUSY` cubre cualquier ventana a pantalla
+/// completa (video, navegador con F11), `QUNS_RUNNING_D3D_FULL_SCREEN` los juegos en
+/// modo exclusivo y `QUNS_PRESENTATION_MODE` el modo presentación de Windows.
+pub fn fullscreen_app_running() -> bool {
+    // SAFETY: la función no recibe argumentos.
+    matches!(
+        unsafe { SHQueryUserNotificationState() },
+        Ok(QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN | QUNS_PRESENTATION_MODE)
+    )
+}
+
+/// Muestra u oculta la ventana sin activarla. Llamar en el hilo principal.
+///
+/// No usamos `WebviewWindow::show()` porque tao muestra con `SW_SHOW`, que activa la
+/// ventana y le roba el foco al juego del que el usuario acaba de salir.
+///
+/// Ojo: tao no se entera de esto y sigue creyendo que la ventana es visible. Cualquier
+/// cambio de flags de tao (p. ej. `set_ignore_cursor_events`) termina en un
+/// `ShowWindow(SW_SHOW)`, así que mientras esté oculta no se le debe tocar nada.
+pub fn set_shown(hwnd: RawHwnd, shown: bool) {
+    let cmd = if shown { SW_SHOWNOACTIVATE } else { SW_HIDE };
+    // SAFETY: sin punteros de por medio; un HWND inválido solo hace fallar la llamada.
+    let _ = unsafe { ShowWindow(hwnd.get(), cmd) };
 }
 
 /// Mueve la ventana sin redimensionarla, sin tocar su orden Z y sin activarla.
