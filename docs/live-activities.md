@@ -42,14 +42,15 @@ la reemplaza, así que un script puede ir actualizando su progreso.
 }
 ```
 
-| Campo        | Tipo       | Requerido | Notas                                                                         |
-| ------------ | ---------- | --------- | ----------------------------------------------------------------------------- |
-| `title`      | string     | sí        | 1–80 caracteres.                                                              |
-| `subtitle`   | string     | no        | Hasta 120 caracteres.                                                         |
-| `state`      | string     | no        | `running` (default), `attention`, `success` o `error`.                        |
-| `progress`   | número 0–1 | no        | Sin él, el progreso es indeterminado (spinner).                               |
-| `icon`       | string     | no        | `claude`, `build`, `deploy`, `download`, `test` o `generic` (default).        |
-| `ttlSeconds` | entero     | no        | Se quita sola después de N segundos. `success`/`error` usan 6 s si no lo das. |
+| Campo        | Tipo       | Requerido | Notas                                                                                                                                       |
+| ------------ | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`      | string     | sí        | 1–80 caracteres.                                                                                                                            |
+| `subtitle`   | string     | no        | Hasta 120 caracteres.                                                                                                                       |
+| `state`      | string     | no        | `running` (default), `attention`, `success` o `error`.                                                                                      |
+| `progress`   | número 0–1 | no        | Sin él, el progreso es indeterminado (spinner).                                                                                             |
+| `icon`       | string     | no        | `claude`, `build`, `deploy`, `download`, `test` o `generic` (default).                                                                      |
+| `ttlSeconds` | entero     | no        | Se quita sola después de N segundos. `success`/`error` usan 6 s si no lo das.                                                               |
+| `focusPid`   | entero     | no        | Al hacer clic en la actividad, la isla trae al frente la ventana de este proceso o de su primer ancestro con ventana (p. ej., la terminal). |
 
 Los campos desconocidos se rechazan con `400`, para que un error de dedo no pase
 desapercibido.
@@ -114,18 +115,30 @@ Invoke-RestMethod -Method Put -Uri http://127.0.0.1:47823/v1/activities/build `
 
 `scripts/claude-hook.mjs` traduce los eventos de los hooks de Claude Code:
 
-| Evento             | En la isla                                          |
-| ------------------ | --------------------------------------------------- |
-| `UserPromptSubmit` | "Claude trabajando" + el nombre del proyecto        |
-| `Notification`     | "Claude te necesita" en ámbar (le gana a la música) |
-| `Stop`             | "Claude terminó" en verde, se va sola en 8 s        |
-| `SessionEnd`       | Se quita                                            |
+| Evento                   | En la isla                                                         |
+| ------------------------ | ------------------------------------------------------------------ |
+| `UserPromptSubmit`       | "Claude trabajando" + el nombre del proyecto                       |
+| `PostToolUse`            | Sigue trabajando; el subtítulo dice qué hizo ("Edit · App.svelte") |
+| `Notification` (permiso) | "Claude te necesita" en ámbar (le gana a la música)                |
+| `Stop`                   | "Claude terminó" en verde, se va sola en 8 s                       |
+| `StopFailure`            | "Claude se detuvo" en rojo (error de la API), se va en 10 s        |
+| `SessionEnd`             | Se quita                                                           |
 
-Cada sesión es su propia actividad, así que dos Claudes en paralelo se ven por separado.
-El hook nunca frena a Claude: si la isla está apagada, termina en silencio.
+- **Clic = ir a la terminal:** el hook manda el PID de su proceso padre y la isla sube
+  por el árbol de procesos hasta la ventana donde corre esa sesión (Windows Terminal,
+  VS Code, termCode…). Funciona en compacto, expandido (botón _Ir a la ventana_) y en
+  la burbuja del split.
+- **Cuándo se quita:** "terminó" a los 8 s y "se detuvo" a los 10 s. "Trabajando" se
+  quita con el `Stop`, o solo a los 10 min sin actividad: si interrumpes a Claude con Esc
+  no corre ningún hook, y así no se queda pegado.
+- El recordatorio de inactividad ("Claude is waiting for your input", 60 s después de
+  terminar) se ignora: no pide nada y dejaría la isla en ámbar.
+- Cada sesión es su propia actividad, así que dos Claudes en paralelo se ven por
+  separado. El hook nunca frena a Claude: si la isla está apagada, termina en silencio.
 
 Agrega esto a `~/.claude/settings.json` (o al `.claude/settings.json` de un proyecto),
-cambiando la ruta por la de tu clon:
+cambiando la ruta por la de tu clon. `async` evita que el hook le sume latencia a Claude;
+`SessionEnd` va sin `async` para que alcance a limpiar antes de que Claude se cierre:
 
 ```json
 {
@@ -136,7 +149,20 @@ cambiando la ruta por la de tu clon:
           {
             "type": "command",
             "command": "node C:/ruta/a/notch_windows/scripts/claude-hook.mjs",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/ruta/a/notch_windows/scripts/claude-hook.mjs",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -147,7 +173,8 @@ cambiando la ruta por la de tu clon:
           {
             "type": "command",
             "command": "node C:/ruta/a/notch_windows/scripts/claude-hook.mjs",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -158,7 +185,20 @@ cambiando la ruta por la de tu clon:
           {
             "type": "command",
             "command": "node C:/ruta/a/notch_windows/scripts/claude-hook.mjs",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/ruta/a/notch_windows/scripts/claude-hook.mjs",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
