@@ -1,4 +1,5 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 /** Lo emite el vigilante de Rust cuando el cursor entra o sale de la pastilla. */
 const HOVER_EVENT = "island:hover";
@@ -18,14 +19,18 @@ export function onHoverIntent(
   let unlisten: UnlistenFn | undefined;
   let disposed = false;
 
-  void listen<boolean>(HOVER_EVENT, ({ payload: hovered }) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => onChange(hovered), hovered ? enterMs : leaveMs);
-  }).then((fn) => {
-    // `listen` es asíncrono: si ya nos desmontaron, soltar el listener en cuanto llegue.
-    if (disposed) fn();
-    else unlisten = fn;
-  });
+  // Hay una ventana por monitor y Rust emite el hover solo a la suya. Un `listen`
+  // global de `@tauri-apps/api/event` recibiría también el de las demás islas.
+  void getCurrentWebviewWindow()
+    .listen<boolean>(HOVER_EVENT, ({ payload: hovered }) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => onChange(hovered), hovered ? enterMs : leaveMs);
+    })
+    .then((fn) => {
+      // `listen` es asíncrono: si ya nos desmontaron, soltar el listener en cuanto llegue.
+      if (disposed) fn();
+      else unlisten = fn;
+    });
 
   return () => {
     disposed = true;
