@@ -57,6 +57,12 @@ tiny_http = "0.12"
 [dev-dependencies]
 windows = { version = "0.62", features = ["Media_Core", "Media_Playback", "Storage"] }
 
+# Sin compilación incremental: con `tauri dev`, clippy, tests y ejemplos, cada
+# configuración guardaba su propia caché y `target/debug/incremental` llegó a 8.5 GB
+# y llenó el disco. El crate es chico: recompilarlo completo cuesta segundos.
+[profile.dev]
+incremental = false
+
 # https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1
