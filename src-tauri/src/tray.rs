@@ -13,6 +13,7 @@ const TOGGLE_ID: &str = "toggle";
 const QUIT_ID: &str = "quit";
 const VISUALIZER_ID: &str = "visualizer";
 const CONFIG_DIR_ID: &str = "config-dir";
+const AUTOSTART_ID: &str = "autostart";
 const DISPLAY_PRIMARY_ID: &str = "display:primary";
 const DISPLAY_ALL_ID: &str = "display:all";
 /// Seguido del id estable del monitor.
@@ -100,6 +101,16 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         settings.visualizer,
         None::<&str>,
     )?;
+    // El estado sale del registro (no de settings.json): el usuario también puede
+    // cambiarlo desde el Administrador de tareas.
+    let autostart = CheckMenuItem::with_id(
+        app,
+        AUTOSTART_ID,
+        "Iniciar con Windows",
+        true,
+        crate::autostart::is_enabled(),
+        None::<&str>,
+    )?;
     // Ahí viven settings.json y el token de la API que leen los scripts y hooks.
     let config = MenuItem::with_id(
         app,
@@ -115,6 +126,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &toggle,
             &display_menu,
             &visualizer,
+            &autostart,
             &PredefinedMenuItem::separator(app)?,
             &config,
             &quit,
@@ -136,6 +148,12 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
         VISUALIZER_ID => {
             app.state::<SettingsStore>()
                 .update(|settings| settings.visualizer = !settings.visualizer);
+            None
+        }
+        AUTOSTART_ID => {
+            if let Err(err) = crate::autostart::set_enabled(!crate::autostart::is_enabled()) {
+                eprintln!("no se pudo cambiar el inicio con Windows: {err}");
+            }
             None
         }
         CONFIG_DIR_ID => {

@@ -17,6 +17,10 @@ la pantalla que crece con animaciones de resorte para mostrar actividades en viv
   [docs/live-activities.md](docs/live-activities.md).
 - **Privacidad:** una burbuja naranja (micrófono) o verde (cámara) junto a la isla
   mientras alguna app los usa, con el nombre de la app para lectores de pantalla.
+- **Split líquido:** cuando hay dos cosas a la vez (Claude trabajando y música), la
+  secundaria sale de la pastilla como una gota y se queda en una burbuja al lado.
+- **Gestos:** rueda sobre la isla = volumen; swipe horizontal (o Shift + rueda) =
+  siguiente/anterior canción; clic = expandir.
 - **Una isla por monitor:** en el principal, en uno concreto o en todos.
 - **Nunca estorba:** fuera de la pastilla los clics pasan a lo que hay debajo, nunca le
   roba el foco a nadie, no aparece en la barra de tareas ni en Alt+Tab, y se esconde
@@ -65,6 +69,9 @@ controla desde el **icono en la bandeja**:
   nombre de modelo) o _Todas las pantallas_.
 - _Visualizador de audio_: captura la salida de audio (nunca el micrófono) solo mientras
   hay música sonando.
+- _Iniciar con Windows_: registra el ejecutable actual en el arranque del usuario (en
+  desarrollo sería el `.exe` de debug; actívalo desde la versión instalada). Respeta lo
+  que se cambie desde el Administrador de tareas.
 - _Abrir carpeta de configuración_: `settings.json` y el token de la API.
 - _Salir_.
 
@@ -114,6 +121,8 @@ de fondo están documentadas en:
   el OSD de volumen de Windows sigue apareciendo.
 - [ADR-0006: API local de Live Activities](docs/ADRs/0006-api-local-de-live-activities.md),
   con su modelo de amenazas.
+- [ADR-0007: Animación y gestos](docs/ADRs/0007-animacion-y-gestos.md), incluyendo por
+  qué aquí se anima `width`/`height`.
 
 ## Estructura
 
@@ -139,9 +148,9 @@ de fondo están documentadas en:
 
 ## Roadmap
 
-- **Interacción:** split líquido con dos actividades, gestos (rueda = volumen, swipe =
-  cambiar canción), física por eje.
-- **Después:** timer/Pomodoro, calendario, audífonos Bluetooth, shelf de archivos,
+- **Siguiente:** aviso de "Copiado" con preview, captura al vuelo (Win+Shift+S), modo
+  notch (pegada al borde con esquinas cóncavas), timer/Pomodoro.
+- **Después:** calendario, audífonos Bluetooth con batería, shelf de archivos,
   notificaciones (requiere MSIX).
 
 ## Convenciones
