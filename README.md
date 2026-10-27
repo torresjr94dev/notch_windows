@@ -69,9 +69,10 @@ controla desde el **icono en la bandeja**:
   nombre de modelo) o _Todas las pantallas_.
 - _Visualizador de audio_: captura la salida de audio (nunca el micrófono) solo mientras
   hay música sonando.
-- _Iniciar con Windows_: registra el ejecutable actual en el arranque del usuario (en
-  desarrollo sería el `.exe` de debug; actívalo desde la versión instalada). Respeta lo
-  que se cambie desde el Administrador de tareas.
+- _Iniciar con Windows_: registra **esta** copia de la app en el arranque del usuario.
+  Si el arranque apunta a otra copia (por ejemplo, la de `tauri dev`), aparece
+  desmarcada y activarla la re-apunta. Respeta lo que se cambie desde el Administrador
+  de tareas.
 - _Abrir carpeta de configuración_: `settings.json` y el token de la API.
 - _Salir_.
 

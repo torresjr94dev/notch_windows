@@ -4,8 +4,13 @@
 //! Si el usuario lo apaga desde el Administrador de tareas, Windows no borra el valor de
 //! `Run`: marca un flag en `StartupApproved\Run`. Por eso el estado real sale de las dos
 //! claves, y al activarlo desde la bandeja se limpia ese flag.
+//!
+//! Solo cuenta como activo si el valor apunta a **este** ejecutable: el que dejó una
+//! copia de desarrollo (o una instalación anterior en otra ruta) arrancaría otro `.exe`.
+//! Así la bandeja lo muestra apagado y activarlo lo re-apunta a esta copia.
 
 use std::ffi::c_void;
+use std::path::Path;
 
 use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::System::Registry::{
@@ -20,7 +25,10 @@ const APPROVED_KEY: &str =
 const VALUE_NAME: &str = "NotchWindows";
 
 pub fn is_enabled() -> bool {
-    has_run_value() && !disabled_in_task_manager()
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    run_command().is_some_and(|command| launches(&command, &exe)) && !disabled_in_task_manager()
 }
 
 /// Activa o desactiva el arranque con Windows para el ejecutable actual.
@@ -52,21 +60,53 @@ pub fn set_enabled(enabled: bool) -> std::io::Result<()> {
     Ok(())
 }
 
-fn has_run_value() -> bool {
+/// El comando registrado en `Run`, si existe.
+fn run_command() -> Option<String> {
+    let (key, name) = (HSTRING::from(RUN_KEY), HSTRING::from(VALUE_NAME));
     let mut size = 0u32;
-    // SAFETY: solo se pide el tamaño (sin búfer).
+    // SAFETY: primero solo se pide el tamaño (sin búfer).
     let result = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
-            &HSTRING::from(RUN_KEY),
-            &HSTRING::from(VALUE_NAME),
+            &key,
+            &name,
             RRF_RT_REG_SZ,
             None,
             None,
             Some(&mut size),
         )
     };
-    result == ERROR_SUCCESS
+    if result != ERROR_SUCCESS {
+        return None;
+    }
+    let mut buffer = vec![0u16; (size as usize).div_ceil(size_of::<u16>())];
+    // SAFETY: `buffer` tiene al menos `size` bytes. Si el valor creció entre las dos
+    // llamadas, devuelve ERROR_MORE_DATA y no se escribe fuera del búfer.
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            &key,
+            &name,
+            RRF_RT_REG_SZ,
+            None,
+            Some(buffer.as_mut_ptr() as *mut c_void),
+            Some(&mut size),
+        )
+    };
+    if result != ERROR_SUCCESS {
+        return None;
+    }
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    Some(String::from_utf16_lossy(&buffer[..len]))
+}
+
+/// ¿El comando de `Run` abre este ejecutable? Se escribe entre comillas, pero también
+/// acepta el valor sin ellas; Windows no distingue mayúsculas en las rutas.
+fn launches(command: &str, exe: &Path) -> bool {
+    command
+        .trim()
+        .trim_matches('"')
+        .eq_ignore_ascii_case(&exe.to_string_lossy())
 }
 
 fn disabled_in_task_manager() -> bool {
@@ -95,7 +135,28 @@ fn approved_flag_disables(data: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::approved_flag_disables;
+    use std::path::Path;
+
+    use super::{approved_flag_disables, launches};
+
+    #[test]
+    fn run_command_must_point_to_this_exe() {
+        let installed = Path::new(r"C:\Users\Ana\AppData\Local\Notch Windows\notch-windows.exe");
+        assert!(launches(
+            r#""C:\Users\Ana\AppData\Local\Notch Windows\notch-windows.exe""#,
+            installed
+        ));
+        assert!(launches(
+            r"c:\users\ana\appdata\local\notch windows\NOTCH-WINDOWS.EXE",
+            installed
+        ));
+        // El que dejó `tauri dev` no arranca la versión instalada.
+        assert!(!launches(
+            r#""C:\src\notch_windows\src-tauri\target\debug\notch-windows.exe""#,
+            installed
+        ));
+        assert!(!launches("", installed));
+    }
 
     #[test]
     fn task_manager_flags() {
