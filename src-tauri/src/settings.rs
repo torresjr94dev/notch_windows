@@ -27,12 +27,16 @@ pub enum DisplayChoice {
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub display: DisplayChoice,
+    /// Barras de audio en Now Playing. Implica capturar el audio del sistema mientras
+    /// suena música, así que el usuario puede apagarlo.
+    pub visualizer: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             display: DisplayChoice::Primary,
+            visualizer: true,
         }
     }
 }

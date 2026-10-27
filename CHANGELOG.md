@@ -26,3 +26,12 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
   isla de los demás.
 - Preferencias persistidas en `settings.json`.
 - ADR-0003 (una ventana por monitor).
+- Motor de actividades: los providers publican y un árbitro decide qué va en la pastilla
+  y qué en la burbuja del split, con prioridades y TTL.
+- Now Playing desde los controles de medios de Windows (GSMTC): carátula, título,
+  artista, progreso con seek y controles de reproducción.
+- Glow, barras y progreso teñidos con el color de acento de la carátula.
+- Visualizador de audio (WASAPI loopback + FFT), activable desde la bandeja.
+- Tests de frontend con vitest; `npm test` corre vitest y cargo test.
+- Fixture `fake_media` para probar Now Playing sin música.
+- ADR-0004 (motor de actividades).

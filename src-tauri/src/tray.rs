@@ -11,6 +11,7 @@ use crate::settings::{DisplayChoice, SettingsStore};
 const TRAY_ID: &str = "main";
 const TOGGLE_ID: &str = "toggle";
 const QUIT_ID: &str = "quit";
+const VISUALIZER_ID: &str = "visualizer";
 const DISPLAY_PRIMARY_ID: &str = "display:primary";
 const DISPLAY_ALL_ID: &str = "display:all";
 /// Seguido del id estable del monitor.
@@ -44,7 +45,8 @@ pub fn refresh(app: &AppHandle) {
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let state = app.state::<IslandState>();
-    let choice = app.state::<SettingsStore>().get().display;
+    let settings = app.state::<SettingsStore>().get();
+    let choice = settings.display;
 
     let toggle_label = if state.user_hidden() {
         "Mostrar isla"
@@ -89,12 +91,21 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         None::<&str>,
     )?)?;
 
+    let visualizer = CheckMenuItem::with_id(
+        app,
+        VISUALIZER_ID,
+        "Visualizador de audio",
+        true,
+        settings.visualizer,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, QUIT_ID, "Salir", true, None::<&str>)?;
     Menu::with_items(
         app,
         &[
             &toggle,
             &display_menu,
+            &visualizer,
             &PredefinedMenuItem::separator(app)?,
             &quit,
         ],
@@ -111,6 +122,11 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
         QUIT_ID => {
             app.exit(0);
             return;
+        }
+        VISUALIZER_ID => {
+            app.state::<SettingsStore>()
+                .update(|settings| settings.visualizer = !settings.visualizer);
+            None
         }
         DISPLAY_PRIMARY_ID => Some(DisplayChoice::Primary),
         DISPLAY_ALL_ID => Some(DisplayChoice::All),
