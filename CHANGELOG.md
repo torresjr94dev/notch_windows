@@ -6,6 +6,12 @@ Todos los cambios relevantes de este proyecto se documentan aquí. El formato si
 
 ## [Sin publicar]
 
+### Seguridad
+
+- Las actions del workflow de release van fijadas a un commit y `checkout` no deja el
+  token en `.git/config`: un tag reapuntado en el repo de una action ya no puede meter
+  código en el instalador publicado.
+
 ## [0.1.0] - 2026-10-27
 
 Primera versión publicada, con instalador para Windows.
