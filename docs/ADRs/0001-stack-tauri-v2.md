@@ -39,8 +39,12 @@ timers, etc.). El stack tiene que cumplir tres requisitos:
 
 - **Positivas:** iteración de UI muy rápida (CSS, HMR de Vite), APIs de Windows completas
   desde Rust y un binario pequeño.
-- **Negativas:** WebView2 suma memoria (procesos del navegador, ~80–150 MB en total).
-  El proceso principal de la app mide ~30 MB.
+- **Negativas:** WebView2 suma memoria. Medido el 2026-10-27 con todas las actividades
+  activas, una isla y en modo desarrollo: el proceso principal usa ~40 MB de memoria
+  privada y ~0.3% de un núcleo en reposo; WebView2 usa **~170 MB privados** repartidos
+  en 6 procesos. La estimación inicial (80–150 MB) se quedó corta. En release debería
+  bajar (sin cliente HMR ni devtools); falta medirlo. Si hace falta recortar, la palanca
+  es `ICoreWebView2_19::MemoryUsageTargetLevel = Low` mientras la isla está en reposo.
 - **Riesgo controlado:** `tao` (el gestor de ventanas de Tauri) es dueño de los estilos
   de la ventana y los reescribe en cada cambio de flags. Las reglas para convivir con eso
   están en el [ADR-0002](0002-ventana-fija-y-click-through.md).
