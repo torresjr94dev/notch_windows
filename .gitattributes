@@ -1,0 +1,7 @@
+# LF en todo el repo, también en Windows: rustfmt y Prettier escriben LF y así
+# git no reescribe finales de línea en cada checkout.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
