@@ -21,6 +21,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.23"
 rustfft = "6.4"
+# Solo para los eventos de brillo (laptops). Comparte `windows` 0.62 con el resto.
+wmi = { version = "0.18", default-features = false }
+# El macro `#[implement]` (callbacks COM) genera rutas a `::windows_core`.
+windows-core = "0.62"
 # Misma versión que usa Tauri internamente: así `WebviewWindow::hwnd()` devuelve el mismo
 # tipo `HWND` y no compilamos dos copias del crate.
 windows = { version = "0.62", features = [
@@ -30,9 +34,15 @@ windows = { version = "0.62", features = [
   "Win32_Devices_Display",
   "Win32_Foundation",
   "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_Security",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
   "Win32_System_Variant",
+  "Win32_UI_Input_KeyboardAndMouse",
   "Win32_Graphics_Gdi",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",

@@ -31,9 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .join("icons")
         .join("128x128.png");
 
-    let item = MediaPlaybackItem::Create(&MediaSource::CreateFromStorageFile(&storage_file(
-        &wav,
-    )?)?)?;
+    let item =
+        MediaPlaybackItem::Create(&MediaSource::CreateFromStorageFile(&storage_file(&wav)?)?)?;
     // MediaPlayer se registra solo en los controles de medios del sistema y publica los
     // metadatos del *item*: los del `DisplayUpdater` del SMTC los sobrescribe.
     let display = item.GetDisplayProperties()?;

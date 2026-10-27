@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use serde::Serialize;
 
-use super::{Activity, Update};
+use super::{Activity, Privacy, Update};
 
 /// Lo que dibujan las islas.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
@@ -16,6 +16,7 @@ pub struct IslandView {
     pub primary: Option<Activity>,
     /// Va en la burbuja del split. Nunca es transitoria ni del mismo tipo que la primaria.
     pub secondary: Option<Activity>,
+    pub privacy: Privacy,
 }
 
 struct Entry {
@@ -28,11 +29,13 @@ struct Entry {
 #[derive(Default)]
 pub struct Board {
     entries: Vec<Entry>,
+    privacy: Privacy,
 }
 
 impl Board {
     pub fn apply(&mut self, update: Update, now: Instant) {
         match update {
+            Update::Privacy(privacy) => self.privacy = privacy,
             Update::Remove(id) => self.entries.retain(|e| e.activity.id != id),
             Update::Upsert(activity) => {
                 let existing = self
@@ -89,7 +92,11 @@ impl Board {
                         .is_none_or(|p| discriminant(&p.data) != discriminant(&a.data))
             })
             .cloned();
-        IslandView { primary, secondary }
+        IslandView {
+            primary,
+            secondary,
+            privacy: self.privacy.clone(),
+        }
     }
 }
 
@@ -99,8 +106,6 @@ mod tests {
 
     use super::*;
     use crate::activity::{ActivityData, NowPlaying};
-
-    const TRANSIENT: u8 = 100;
 
     fn media(id: &str, priority: u8, title: &str) -> Activity {
         Activity {
@@ -122,12 +127,15 @@ mod tests {
         }
     }
 
-    fn transient(id: &str, ttl_ms: u64) -> Activity {
-        Activity {
-            transient: true,
-            ttl: Some(Duration::from_millis(ttl_ms)),
-            ..media(id, TRANSIENT, id)
-        }
+    fn volume(level: f32, ttl_ms: u64) -> Activity {
+        Activity::transient(
+            "volume",
+            ActivityData::Volume {
+                level,
+                muted: false,
+            },
+            Duration::from_millis(ttl_ms),
+        )
     }
 
     fn ids(view: &IslandView) -> (Option<&str>, Option<&str>) {
@@ -161,17 +169,40 @@ mod tests {
     }
 
     #[test]
+    fn transient_takes_the_pill_and_pushes_music_to_the_bubble() {
+        let t0 = Instant::now();
+        let mut board = Board::default();
+        board.apply(Update::Upsert(media("music", 50, "song")), t0);
+        board.apply(Update::Upsert(volume(0.5, 2000)), t0);
+        assert_eq!(ids(&board.view()), (Some("volume"), Some("music")));
+    }
+
+    #[test]
     fn secondary_skips_transients_and_same_kind() {
         let t0 = Instant::now();
         let mut board = Board::default();
         board.apply(Update::Upsert(media("music", 50, "song")), t0);
-        board.apply(Update::Upsert(transient("volume", 2000)), t0);
-        // El volumen se queda la pastilla y la música pasa a la burbuja… salvo que sean
-        // del mismo tipo, como en este test, donde no hay burbuja.
-        assert_eq!(ids(&board.view()), (Some("volume"), None));
-
         board.apply(Update::Upsert(media("other", 40, "x")), t0);
-        assert_eq!(ids(&board.view()).1, None);
+        assert_eq!(ids(&board.view()), (Some("music"), None));
+
+        board.apply(Update::Upsert(media("music", 5, "song")), t0);
+        board.apply(Update::Upsert(volume(0.5, 2000)), t0);
+        // Primaria: el volumen. La burbuja no puede ser otro transitorio y se queda
+        // con la mejor de las persistentes.
+        assert_eq!(ids(&board.view()), (Some("volume"), Some("other")));
+    }
+
+    #[test]
+    fn privacy_rides_along_with_any_activity() {
+        let t0 = Instant::now();
+        let mut board = Board::default();
+        let privacy = Privacy {
+            microphone: vec!["Teams".into()],
+            camera: vec![],
+        };
+        board.apply(Update::Privacy(privacy.clone()), t0);
+        board.apply(Update::Upsert(media("music", 50, "song")), t0);
+        assert_eq!(board.view().privacy, privacy);
     }
 
     #[test]
@@ -179,7 +210,7 @@ mod tests {
         let t0 = Instant::now();
         let mut board = Board::default();
         board.apply(Update::Upsert(media("music", 50, "song")), t0);
-        board.apply(Update::Upsert(transient("volume", 2000)), t0);
+        board.apply(Update::Upsert(volume(0.5, 2000)), t0);
         assert_eq!(board.next_expiry(), Some(t0 + Duration::from_secs(2)));
 
         board.expire(t0 + Duration::from_millis(1999));
@@ -193,16 +224,17 @@ mod tests {
     fn identical_republish_keeps_ttl_but_changes_restart_it() {
         let t0 = Instant::now();
         let mut board = Board::default();
-        board.apply(Update::Upsert(transient("volume", 2000)), t0);
+        board.apply(Update::Upsert(volume(0.5, 2000)), t0);
         board.apply(
-            Update::Upsert(transient("volume", 2000)),
+            Update::Upsert(volume(0.5, 2000)),
             t0 + Duration::from_secs(1),
         );
         assert_eq!(board.next_expiry(), Some(t0 + Duration::from_secs(2)));
 
-        let mut louder = transient("volume", 2000);
-        louder.priority -= 1;
-        board.apply(Update::Upsert(louder), t0 + Duration::from_secs(1));
+        board.apply(
+            Update::Upsert(volume(0.6, 2000)),
+            t0 + Duration::from_secs(1),
+        );
         assert_eq!(board.next_expiry(), Some(t0 + Duration::from_secs(3)));
     }
 

@@ -3,7 +3,7 @@
 //! pastilla y cuál en la burbuja del split, y emite la vista a todas las islas.
 //!
 //! El frontend solo dibuja la vista: los tipos de aquí tienen su espejo en
-//! `src/lib/activity.ts` y deben mantenerse en sync.
+//! `src/lib/activity.svelte.ts` y deben mantenerse en sync.
 
 mod board;
 
@@ -22,6 +22,8 @@ pub const VIEW_EVENT: &str = "island:view";
 
 /// Prioridades: la actividad con el número más alto se queda con la pastilla.
 pub mod priority {
+    /// Avisos de un par de segundos: volumen, brillo, Bloq Mayús, cargador.
+    pub const TRANSIENT: u8 = 100;
     pub const MEDIA_PLAYING: u8 = 50;
     pub const MEDIA_PAUSED: u8 = 10;
 }
@@ -46,9 +48,40 @@ pub struct NowPlaying {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ActivityData {
     NowPlaying(NowPlaying),
+    /// `level` de 0 a 1.
+    Volume {
+        level: f32,
+        muted: bool,
+    },
+    /// `level` de 0 a 1.
+    Brightness {
+        level: f32,
+    },
+    Battery {
+        percent: u8,
+        charging: bool,
+        /// Por debajo del umbral de batería baja y sin cargador.
+        low: bool,
+    },
+    CapsLock {
+        on: bool,
+    },
+}
+
+/// Apps usando el micrófono o la cámara. No es una actividad: se muestra junto a
+/// cualquiera, como los puntos de privacidad del iPhone.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Privacy {
+    pub microphone: Vec<String>,
+    pub camera: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -65,9 +98,23 @@ pub struct Activity {
     pub ttl: Option<Duration>,
 }
 
+impl Activity {
+    /// Aviso de sistema que se muestra `ttl` y desaparece solo.
+    pub fn transient(id: &str, data: ActivityData, ttl: Duration) -> Self {
+        Self {
+            id: id.to_owned(),
+            priority: priority::TRANSIENT,
+            transient: true,
+            data,
+            ttl: Some(ttl),
+        }
+    }
+}
+
 pub enum Update {
     Upsert(Activity),
     Remove(String),
+    Privacy(Privacy),
 }
 
 /// Punto de entrada para los providers. Es barato de clonar y se puede usar desde
@@ -84,6 +131,10 @@ impl ActivityHub {
 
     pub fn remove(&self, id: impl Into<String>) {
         let _ = self.tx.send(Update::Remove(id.into()));
+    }
+
+    pub fn set_privacy(&self, privacy: Privacy) {
+        let _ = self.tx.send(Update::Privacy(privacy));
     }
 }
 
