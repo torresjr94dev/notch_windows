@@ -1,0 +1,25 @@
+<!--
+  Fuente del ícono de la app. Los PNG, el .ico y el .icns de esta carpeta se generan
+  desde aquí:  npx tauri icon src-tauri/icons/app-icon.svg
+  (borra después las carpetas android/ e ios/: la app es solo para Windows).
+
+  La isla negra va sobre un fondo de color para que se distinga a 16 px en la bandeja,
+  con la barra de tareas clara u oscura. Adentro: carátula, visualizador y el punto del
+  indicador de privacidad.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6" />
+      <stop offset="1" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="216" fill="url(#bg)" />
+  <rect x="136" y="372" width="752" height="280" rx="140" fill="#000" />
+  <rect x="236" y="442" width="140" height="140" rx="36" fill="#f5f5f7" />
+  <g fill="#30d158">
+    <rect x="606" y="472" width="34" height="80" rx="17" />
+    <rect x="662" y="440" width="34" height="144" rx="17" />
+    <rect x="718" y="488" width="34" height="48" rx="17" />
+  </g>
+</svg>
